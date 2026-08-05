@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>Transparent HUD Widget · Preview</title>
+<style>
+    /* ============================================================
+       独立预览页（非 SillyTavern 环境）
+       用途：单独查看 / 调试悬浮时间天气组件的视觉设计。
+       本页时间为「本机实时时钟」，仅用于设计演示；
+       在 SillyTavern 扩展内实际显示的是从剧情中扫描出的「剧情时间」，
+       两者使用完全相同的一套 CSS（见 style.css），可直接复制迁移。
+       ============================================================ */
+
+    * { box-sizing: border-box; }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: radial-gradient(ellipse at 30% 20%, #1b2735 0%, #090a0f 60%, #000 100%);
+        overflow: hidden;
+    }
+
+    body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* 背景装饰网格，仅用于演示透明穿透效果，与组件无关 */
+    .bg-grid {
+        position: fixed;
+        inset: 0;
+        background-image:
+            linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+        background-size: 42px 42px;
+        pointer-events: none;
+    }
+
+    :root {
+        --dt-hud-fg: rgba(255, 255, 255, 0.92);
+        --dt-hud-fg-dim: rgba(255, 255, 255, 0.62);
+        --dt-hud-fg-faint: rgba(255, 255, 255, 0.4);
+        --dt-hud-glow: rgba(255, 255, 255, 0.55);
+        --dt-hud-line: rgba(255, 255, 255, 0.85);
+        --dt-hud-time-size: clamp(56px, 10vw, 108px);
+        --dt-hud-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue",
+            "PingFang SC", "Segoe UI", Arial, sans-serif;
+    }
+
+    #dt_weather_hud_panel {
+        position: relative;
+        min-width: 300px;
+        padding: 30px 46px 24px 46px;
+        background: transparent;
+        backdrop-filter: blur(1.5px);
+        -webkit-backdrop-filter: blur(1.5px);
+        border: none;
+        border-radius: 4px;
+        color: var(--dt-hud-fg);
+        font-family: var(--dt-hud-font);
+        text-align: center;
+        user-select: none;
+        cursor: grab;
+        animation: dtHudBreathe 6s ease-in-out infinite;
+    }
+
+    #dt_weather_hud_panel.dt-hud-dragging {
+        cursor: grabbing;
+        animation-play-state: paused;
+    }
+
+    @keyframes dtHudBreathe {
+        0%, 100% { transform: translateY(0); }
+        50%      { transform: translateY(-6px); }
+    }
+
+    .dt-hud-corner {
+        position: absolute;
+        width: 26px;
+        height: 26px;
+        opacity: 0;
+        pointer-events: none;
+        animation: dtCornerFadeIn 1.4s ease forwards;
+        animation-delay: 0.5s;
+    }
+
+    .dt-hud-corner-tl {
+        top: -10px; left: -10px;
+        border-top: 1px solid var(--dt-hud-line);
+        border-left: 1px solid var(--dt-hud-line);
+        filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
+    }
+
+    .dt-hud-corner-br {
+        bottom: -10px; right: -10px;
+        border-bottom: 1px solid var(--dt-hud-line);
+        border-right: 1px solid var(--dt-hud-line);
+        filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
+    }
+
+    @keyframes dtCornerFadeIn {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+
+    .dt-hud-time-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        font-size: var(--dt-hud-time-size);
+        font-weight: 200;
+        letter-spacing: 3px;
+        line-height: 1;
+        color: var(--dt-hud-fg);
+        text-shadow: 0 0 18px var(--dt-hud-glow), 0 0 2px rgba(255, 255, 255, 0.8);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .dt-hud-hour, .dt-hud-minute { min-width: 1.1ch; }
+
+    .dt-hud-colon {
+        display: inline-block;
+        margin: 0 4px;
+        animation: dtColonBlink 1s ease-in-out infinite;
+    }
+
+    @keyframes dtColonBlink {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0.12; }
+    }
+
+    .dt-hud-date-row {
+        margin-top: 10px;
+        font-size: 14px;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        color: var(--dt-hud-fg-dim);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        white-space: nowrap;
+    }
+
+    .dt-hud-date-row .dt-hud-sep { opacity: 0.5; font-size: 11px; }
+
+    .dt-hud-weather-row {
+        margin-top: 6px;
+        font-size: 14px;
+        letter-spacing: 3px;
+        color: var(--dt-hud-fg-faint);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        white-space: nowrap;
+    }
+
+    .dt-hud-weather-icon {
+        width: 16px; height: 16px;
+        display: inline-flex; align-items: center; justify-content: center;
+        flex-shrink: 0; opacity: 0.85;
+    }
+
+    .dt-hud-weather-icon svg {
+        width: 100%; height: 100%;
+        stroke: rgba(255,255,255,0.85); fill: none;
+        stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round;
+    }
+
+    .dt-hud-temp { opacity: 0.9; }
+
+    .hint {
+        position: fixed;
+        bottom: 22px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: rgba(255,255,255,0.35);
+        font-family: var(--dt-hud-font);
+        font-size: 12px;
+        letter-spacing: 1px;
+    }
+</style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+
+    <div id="dt_weather_hud_panel">
+        <div class="dt-hud-corner dt-hud-corner-tl"></div>
+        <div class="dt-hud-corner dt-hud-corner-br"></div>
+
+        <div class="dt-hud-time-row" id="drag_handle">
+            <span class="dt-hud-hour" id="hour">--</span>
+            <span class="dt-hud-colon">:</span>
+            <span class="dt-hud-minute" id="minute">--</span>
+        </div>
+
+        <div class="dt-hud-date-row">
+            <span id="date">----.--.--</span>
+            <span class="dt-hud-sep">/</span>
+            <span id="weekday">-</span>
+        </div>
+
+        <div class="dt-hud-weather-row">
+            <span class="dt-hud-weather-icon" id="weather-icon"></span>
+            <span id="weather-text">--</span>
+            <span class="dt-hud-temp" id="weather-temp"></span>
+        </div>
+    </div>
+
+    <div class="hint">拖动组件可自由移动位置 · 此页面使用本机实时时钟仅作视觉演示</div>
+
+<script>
+    // ------------------------------------------------------------
+    // 演示用：真实时钟每秒更新（冒号闪烁 + 数字跳动）
+    // 在实际 SillyTavern 扩展中，这里的数据来源是"从剧情文本中
+    // 扫描到的最后一次日期/时间/天气"，而不是系统时钟。
+    // ------------------------------------------------------------
+
+    const WEEKDAY_CN = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+
+    const WEATHER_ICONS = {
+        sun: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+        cloud: '<svg viewBox="0 0 24 24"><path d="M7 17h10a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7.1 8.5 4 4 0 0 0 7 17z"/></svg>',
+        rain: '<svg viewBox="0 0 24 24"><path d="M7 13h9a3.8 3.8 0 0 0 .4-7.58A5.2 5.2 0 0 0 7.2 4.9 3.8 3.8 0 0 0 7 13z"/><path d="M8 17l-1 2.5M12 17l-1 2.5M16 17l-1 2.5"/></svg>',
+        snow: '<svg viewBox="0 0 24 24"><path d="M7 12h9a3.8 3.8 0 0 0 .4-7.58A5.2 5.2 0 0 0 7.2 3.9 3.8 3.8 0 0 0 7 12z"/><path d="M9 16v6M6 18l6 2M12 18l-6 2M15 16v6M13 18l4 2M17 18l-4 2"/></svg>',
+        moon: '<svg viewBox="0 0 24 24"><path d="M18 13.5A7 7 0 0 1 9.5 5 7.5 7.5 0 1 0 18 13.5z"/></svg>',
+    };
+
+    function updateClock() {
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const yyyy = now.getFullYear();
+        const mo = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const hour = now.getHours();
+
+        document.getElementById('hour').textContent = hh;
+        document.getElementById('minute').textContent = mm;
+        document.getElementById('date').textContent = `${yyyy}.${mo}.${dd}`;
+        document.getElementById('weekday').textContent = WEEKDAY_CN[now.getDay()];
+
+        // 演示：根据时间段自动切换示例天气图标（实际扩展中由剧情文本决定）
+        const isNight = hour < 6 || hour >= 19;
+        document.getElementById('weather-icon').innerHTML = isNight ? WEATHER_ICONS.moon : WEATHER_ICONS.sun;
+        document.getElementById('weather-text').textContent = isNight ? 'Clear Night' : 'Clear';
+        document.getElementById('weather-temp').textContent = '28°C';
+    }
+
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // 简单拖动演示
+    (function makeDraggable() {
+        const panel = document.getElementById('dt_weather_hud_panel');
+        const handle = document.getElementById('drag_handle');
+        let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+
+        handle.addEventListener('pointerdown', (e) => {
+            dragging = true;
+            panel.classList.add('dt-hud-dragging');
+            const rect = panel.getBoundingClientRect();
+            ox = rect.left; oy = rect.top;
+            sx = e.clientX; sy = e.clientY;
+            panel.style.position = 'fixed';
+            handle.setPointerCapture(e.pointerId);
+        });
+
+        handle.addEventListener('pointermove', (e) => {
+            if (!dragging) return;
+            panel.style.left = (ox + e.clientX - sx) + 'px';
+            panel.style.top = (oy + e.clientY - sy) + 'px';
+        });
+
+        const end = () => { dragging = false; panel.classList.remove('dt-hud-dragging'); };
+        handle.addEventListener('pointerup', end);
+        handle.addEventListener('pointercancel', end);
+    })();
+</script>
+</body>
+</html>

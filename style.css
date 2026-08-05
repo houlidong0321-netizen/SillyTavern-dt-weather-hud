@@ -1,0 +1,237 @@
+/* ==========================================================
+   剧情时间天气悬浮窗 - 默认样式
+   风格：Transparent HUD / macOS 小组件 / 玻璃拟态 / 极简科技感
+   完全透明背景，仅保留文字、细线、微弱发光。不使用任何 emoji 或位图。
+   用户可在扩展设置中导入自定义 CSS 覆盖以下全部样式。
+   ========================================================== */
+
+:root {
+    --dt-hud-fg: rgba(255, 255, 255, 0.92);
+    --dt-hud-fg-dim: rgba(255, 255, 255, 0.62);
+    --dt-hud-fg-faint: rgba(255, 255, 255, 0.4);
+    --dt-hud-glow: rgba(255, 255, 255, 0.55);
+    --dt-hud-line: rgba(255, 255, 255, 0.85);
+    --dt-hud-time-size: clamp(46px, 7vw, 78px);
+    --dt-hud-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue",
+        "PingFang SC", "Segoe UI", Arial, sans-serif;
+}
+
+/* ---------- 悬浮窗容器：完全透明，无卡片、无实色背景 ---------- */
+#dt_weather_hud_panel {
+    position: fixed;
+    top: 60px;
+    right: 40px;
+    z-index: 9999;
+    min-width: 220px;
+    padding: 22px 30px 18px 30px;
+    background: transparent;
+    /* 允许轻微背景折射但不产生明显色块 */
+    backdrop-filter: blur(1.5px);
+    -webkit-backdrop-filter: blur(1.5px);
+    border: none;
+    box-shadow: none;
+    border-radius: 4px;
+    color: var(--dt-hud-fg);
+    font-family: var(--dt-hud-font);
+    text-align: center;
+    user-select: none;
+    cursor: grab;
+    animation: dtHudBreathe 6s ease-in-out infinite;
+    transition: opacity 0.25s ease;
+}
+
+#dt_weather_hud_panel.dt-hud-dragging {
+    cursor: grabbing;
+    animation-play-state: paused;
+}
+
+/* 呼吸感：整个组件轻微上下漂浮 */
+@keyframes dtHudBreathe {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-5px); }
+}
+
+/* ---------- 角框装饰：左上 L 型 / 右下反 L 型 ---------- */
+.dt-hud-corner {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    opacity: 0;
+    pointer-events: none;
+    animation: dtCornerFadeIn 1.4s ease forwards;
+    animation-delay: 0.5s;
+}
+
+.dt-hud-corner-tl {
+    top: -8px;
+    left: -8px;
+    border-top: 1px solid var(--dt-hud-line);
+    border-left: 1px solid var(--dt-hud-line);
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
+}
+
+.dt-hud-corner-br {
+    bottom: -8px;
+    right: -8px;
+    border-bottom: 1px solid var(--dt-hud-line);
+    border-right: 1px solid var(--dt-hud-line);
+    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
+}
+
+@keyframes dtCornerFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ---------- 时间主体：超大数字 + 动态冒号 ---------- */
+.dt-hud-time-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    font-size: var(--dt-hud-time-size);
+    font-weight: 200;
+    letter-spacing: 2px;
+    line-height: 1;
+    color: var(--dt-hud-fg);
+    text-shadow: 0 0 14px var(--dt-hud-glow), 0 0 2px rgba(255, 255, 255, 0.8);
+    font-variant-numeric: tabular-nums;
+}
+
+.dt-hud-hour,
+.dt-hud-minute {
+    min-width: 1.1ch;
+}
+
+.dt-hud-colon {
+    display: inline-block;
+    margin: 0 2px;
+    animation: dtColonBlink 1s ease-in-out infinite;
+}
+
+/* 冒号每秒闪烁一次，仅影响冒号本身，渐隐渐现 */
+@keyframes dtColonBlink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.12; }
+}
+
+/* ---------- 日期行 ---------- */
+.dt-hud-date-row {
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--dt-hud-fg-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.dt-hud-date-row .dt-hud-sep {
+    opacity: 0.5;
+    font-size: 10px;
+}
+
+/* ---------- 天气行 ---------- */
+.dt-hud-weather-row {
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 2px;
+    color: var(--dt-hud-fg-faint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.dt-hud-weather-icon {
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    opacity: 0.85;
+}
+
+.dt-hud-weather-icon svg {
+    width: 100%;
+    height: 100%;
+    stroke: rgba(255, 255, 255, 0.85);
+    fill: none;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.dt-hud-temp {
+    opacity: 0.9;
+}
+
+/* ---------- 折叠按钮：极简，默认隐藏，悬停显现 ---------- */
+.dt-hud-collapse-btn {
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: var(--dt-hud-fg-faint);
+    opacity: 0;
+    cursor: pointer;
+    padding: 4px 10px;
+    transition: opacity 0.2s ease;
+    letter-spacing: 1px;
+}
+
+#dt_weather_hud_panel:hover .dt-hud-collapse-btn {
+    opacity: 0.6;
+}
+
+.dt-hud-collapse-btn:hover {
+    opacity: 1 !important;
+}
+
+/* 折叠状态：仅保留时间，隐藏日期/天气行 */
+#dt_weather_hud_panel.dt-hud-collapsed .dt-hud-date-row,
+#dt_weather_hud_panel.dt-hud-collapsed .dt-hud-weather-row {
+    display: none;
+}
+
+#dt_weather_hud_panel.dt-hud-collapsed {
+    padding-bottom: 10px;
+}
+
+/* 空数据占位状态：更淡一些，提示尚未识别到信息 */
+.dt-hud-empty {
+    opacity: 0.45;
+}
+
+/* ---------- 设置面板内部小样式（后台，不属于悬浮窗本身） ---------- */
+.dt-hud-settings-block .flex-container {
+    align-items: center;
+    gap: 8px;
+}
+
+.dt-hud-settings-block textarea#dt_hud_custom_css {
+    width: 100%;
+    min-height: 110px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 12px;
+}
+
+.dt-hud-settings-block .dt-hud-hint {
+    font-size: 11px;
+    opacity: 0.7;
+    margin: 2px 0 8px 0;
+}
+
+.dt-hud-settings-block .dt-hud-btn-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+}
