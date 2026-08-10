@@ -235,3 +235,368 @@
     flex-wrap: wrap;
     margin-top: 6px;
 }
+
+/* ==========================================================
+   v3 新增：侧边展开栏（月历 / 待办 / 场景 / 摘要）
+   延续透明 HUD 风格：无实色卡片，仅细线、微弱底噪与发光
+   ========================================================== */
+
+/* 悬浮窗主体区域（时间+日期+天气），点击它可展开侧栏 */
+.dt-hud-main {
+    cursor: pointer;
+}
+
+#dt_weather_hud_panel.dt-hud-drawer-open {
+    /* 侧栏展开时停止呼吸浮动，避免内容跟着晃 */
+    animation-play-state: paused;
+}
+
+/* ---------- 侧栏容器 ---------- */
+.dt-hud-drawer {
+    position: absolute;
+    top: 0;
+    width: 268px;
+    max-height: 70vh;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(0) scale(0.97);
+    transform-origin: top center;
+    transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    background: transparent;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    color: var(--dt-hud-fg);
+    font-family: var(--dt-hud-font);
+    text-align: left;
+    cursor: default;
+}
+
+/* 展开方向：向左（关闭态从右侧微微滑入） */
+#dt_weather_hud_panel.dt-hud-drawer-left .dt-hud-drawer {
+    right: calc(100% + 6px);
+    transform-origin: top right;
+    transform: translateX(10px) scale(0.97);
+}
+
+/* 展开方向：向右（关闭态从左侧微微滑入） */
+#dt_weather_hud_panel.dt-hud-drawer-right .dt-hud-drawer {
+    left: calc(100% + 6px);
+    transform-origin: top left;
+    transform: translateX(-10px) scale(0.97);
+}
+
+/* 展开态：归位 */
+#dt_weather_hud_panel.dt-hud-drawer-left.dt-hud-drawer-open .dt-hud-drawer,
+#dt_weather_hud_panel.dt-hud-drawer-right.dt-hud-drawer-open .dt-hud-drawer {
+    transform: translateX(0) scale(1);
+}
+
+#dt_weather_hud_panel.dt-hud-drawer-open .dt-hud-drawer {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.dt-hud-drawer-inner {
+    padding: 14px 16px 16px 16px;
+    max-height: 70vh;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    /* 极淡的底噪，保证深色/浅色背景下文字都能看清，但不形成明显色块 */
+    background: rgba(10, 12, 18, 0.28);
+}
+
+/* 细滚动条 */
+.dt-hud-drawer-inner::-webkit-scrollbar { width: 3px; }
+.dt-hud-drawer-inner::-webkit-scrollbar-track { background: transparent; }
+.dt-hud-drawer-inner::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 3px;
+}
+
+/* ---------- 标签页 ---------- */
+.dt-hud-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dt-hud-tab {
+    flex: 1;
+    text-align: center;
+    padding: 6px 0 8px 0;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--dt-hud-fg-faint);
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.dt-hud-tab:hover { color: var(--dt-hud-fg-dim); }
+
+.dt-hud-tab.active {
+    color: var(--dt-hud-fg);
+    border-bottom-color: rgba(255, 255, 255, 0.75);
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
+}
+
+.dt-hud-tab-page { display: none; }
+.dt-hud-tab-page.active { display: block; }
+
+/* ---------- 月历 ---------- */
+.dt-hud-cal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.dt-hud-cal-title {
+    font-size: 14px;
+    letter-spacing: 3px;
+    color: var(--dt-hud-fg);
+    font-variant-numeric: tabular-nums;
+}
+
+.dt-hud-cal-nav {
+    cursor: pointer;
+    padding: 2px 10px;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--dt-hud-fg-faint);
+    transition: color 0.2s ease;
+    user-select: none;
+}
+.dt-hud-cal-nav:hover { color: var(--dt-hud-fg); }
+
+.dt-hud-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.dt-hud-cal-cell {
+    position: relative;
+    height: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    border-radius: 4px;
+}
+
+.dt-hud-cal-weekday {
+    height: 20px;
+    color: var(--dt-hud-fg-faint);
+    font-size: 10px;
+    letter-spacing: 0;
+}
+
+.dt-hud-cal-blank { visibility: hidden; }
+
+.dt-hud-cal-day {
+    color: var(--dt-hud-fg-dim);
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.dt-hud-cal-day:hover {
+    color: var(--dt-hud-fg);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+/* 剧情"今天" */
+.dt-hud-cal-day.is-story-today .dt-hud-cal-num {
+    color: #fff;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+    font-weight: 600;
+}
+
+/* 选中日期 */
+.dt-hud-cal-day.is-selected {
+    border-color: rgba(255, 255, 255, 0.55);
+    color: #fff;
+}
+
+.dt-hud-cal-num { line-height: 1; }
+
+.dt-hud-cal-dots {
+    display: flex;
+    gap: 2px;
+    margin-top: 3px;
+    height: 4px;
+    align-items: center;
+}
+
+.dt-hud-cal-dots i {
+    display: block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    box-shadow: 0 0 4px currentColor;
+}
+
+/* ---------- 待办列表 ---------- */
+.dt-hud-todo-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 14px 0 6px 0;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--dt-hud-fg-dim);
+}
+
+.dt-hud-todo-add {
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 0 4px;
+    color: var(--dt-hud-fg-faint);
+    transition: color 0.2s ease;
+}
+.dt-hud-todo-add:hover { color: var(--dt-hud-fg); }
+
+.dt-hud-todo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dt-hud-todo-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--dt-hud-fg-dim);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dt-hud-todo-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--dt-hud-fg);
+}
+
+.dt-hud-todo-item.is-done .dt-hud-todo-text {
+    text-decoration: line-through;
+    opacity: 0.45;
+}
+
+.dt-hud-todo-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 5px currentColor;
+}
+
+.dt-hud-todo-text {
+    flex: 1;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.dt-hud-todo-src {
+    font-size: 9px;
+    opacity: 0.4;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+}
+
+.dt-hud-todo-del {
+    cursor: pointer;
+    opacity: 0.35;
+    font-size: 13px;
+    padding: 0 2px;
+    flex-shrink: 0;
+}
+.dt-hud-todo-del:hover { opacity: 1; }
+
+.dt-hud-todo-empty {
+    font-size: 11px;
+    color: var(--dt-hud-fg-faint);
+    padding: 8px 2px;
+    letter-spacing: 1px;
+}
+
+/* ---------- 场景页：地点 / 着装 ---------- */
+.dt-hud-section-title {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--dt-hud-fg-faint);
+    margin: 4px 0 6px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dt-hud-section-title:not(:first-child) { margin-top: 16px; }
+
+.dt-hud-location {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--dt-hud-fg);
+    letter-spacing: 1px;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+}
+
+.dt-hud-outfit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.dt-hud-outfit-item {
+    padding-left: 8px;
+    border-left: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.dt-hud-outfit-name {
+    font-size: 12px;
+    color: var(--dt-hud-fg);
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+}
+
+.dt-hud-outfit-desc {
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--dt-hud-fg-dim);
+}
+
+/* ---------- 摘要页 ---------- */
+.dt-hud-chapter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.dt-hud-chapter-item {
+    padding-left: 9px;
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dt-hud-chapter-num {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--dt-hud-fg-faint);
+    margin-bottom: 3px;
+}
+
+.dt-hud-chapter-text {
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--dt-hud-fg-dim);
+    word-break: break-word;
+}

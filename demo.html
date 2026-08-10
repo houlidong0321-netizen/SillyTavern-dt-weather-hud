@@ -2,284 +2,350 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<title>Transparent HUD Widget · Preview</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Transparent HUD Widget · Preview v3</title>
+<link rel="stylesheet" href="style.css" />
 <style>
     /* ============================================================
        独立预览页（非 SillyTavern 环境）
-       用途：单独查看 / 调试悬浮时间天气组件的视觉设计。
-       本页时间为「本机实时时钟」，仅用于设计演示；
-       在 SillyTavern 扩展内实际显示的是从剧情中扫描出的「剧情时间」，
-       两者使用完全相同的一套 CSS（见 style.css），可直接复制迁移。
+       直接引用扩展真实的 style.css，因此这里看到的就是实际效果。
+       本页使用【示例假数据】，仅用于确认视觉与交互。
        ============================================================ */
-
-    * { box-sizing: border-box; }
-
     html, body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
+        margin: 0; padding: 0; height: 100%;
         background: radial-gradient(ellipse at 30% 20%, #1b2735 0%, #090a0f 60%, #000 100%);
         overflow: hidden;
     }
-
-    body {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    /* 背景装饰网格，仅用于演示透明穿透效果，与组件无关 */
     .bg-grid {
-        position: fixed;
-        inset: 0;
+        position: fixed; inset: 0; pointer-events: none;
         background-image:
             linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
         background-size: 42px 42px;
-        pointer-events: none;
     }
-
-    :root {
-        --dt-hud-fg: rgba(255, 255, 255, 0.92);
-        --dt-hud-fg-dim: rgba(255, 255, 255, 0.62);
-        --dt-hud-fg-faint: rgba(255, 255, 255, 0.4);
-        --dt-hud-glow: rgba(255, 255, 255, 0.55);
-        --dt-hud-line: rgba(255, 255, 255, 0.85);
-        --dt-hud-time-size: clamp(56px, 10vw, 108px);
-        --dt-hud-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue",
-            "PingFang SC", "Segoe UI", Arial, sans-serif;
-    }
-
-    #dt_weather_hud_panel {
-        position: relative;
-        min-width: 300px;
-        padding: 30px 46px 24px 46px;
-        background: transparent;
-        backdrop-filter: blur(1.5px);
-        -webkit-backdrop-filter: blur(1.5px);
-        border: none;
-        border-radius: 4px;
-        color: var(--dt-hud-fg);
-        font-family: var(--dt-hud-font);
-        text-align: center;
-        user-select: none;
-        cursor: grab;
-        animation: dtHudBreathe 6s ease-in-out infinite;
-    }
-
-    #dt_weather_hud_panel.dt-hud-dragging {
-        cursor: grabbing;
-        animation-play-state: paused;
-    }
-
-    @keyframes dtHudBreathe {
-        0%, 100% { transform: translateY(0); }
-        50%      { transform: translateY(-6px); }
-    }
-
-    .dt-hud-corner {
-        position: absolute;
-        width: 26px;
-        height: 26px;
-        opacity: 0;
-        pointer-events: none;
-        animation: dtCornerFadeIn 1.4s ease forwards;
-        animation-delay: 0.5s;
-    }
-
-    .dt-hud-corner-tl {
-        top: -10px; left: -10px;
-        border-top: 1px solid var(--dt-hud-line);
-        border-left: 1px solid var(--dt-hud-line);
-        filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
-    }
-
-    .dt-hud-corner-br {
-        bottom: -10px; right: -10px;
-        border-bottom: 1px solid var(--dt-hud-line);
-        border-right: 1px solid var(--dt-hud-line);
-        filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
-    }
-
-    @keyframes dtCornerFadeIn {
-        from { opacity: 0; }
-        to   { opacity: 1; }
-    }
-
-    .dt-hud-time-row {
-        display: flex;
-        align-items: baseline;
-        justify-content: center;
-        font-size: var(--dt-hud-time-size);
-        font-weight: 200;
-        letter-spacing: 3px;
-        line-height: 1;
-        color: var(--dt-hud-fg);
-        text-shadow: 0 0 18px var(--dt-hud-glow), 0 0 2px rgba(255, 255, 255, 0.8);
-        font-variant-numeric: tabular-nums;
-    }
-
-    .dt-hud-hour, .dt-hud-minute { min-width: 1.1ch; }
-
-    .dt-hud-colon {
-        display: inline-block;
-        margin: 0 4px;
-        animation: dtColonBlink 1s ease-in-out infinite;
-    }
-
-    @keyframes dtColonBlink {
-        0%, 100% { opacity: 1; }
-        50%      { opacity: 0.12; }
-    }
-
-    .dt-hud-date-row {
-        margin-top: 10px;
-        font-size: 14px;
-        letter-spacing: 4px;
-        text-transform: uppercase;
-        color: var(--dt-hud-fg-dim);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        white-space: nowrap;
-    }
-
-    .dt-hud-date-row .dt-hud-sep { opacity: 0.5; font-size: 11px; }
-
-    .dt-hud-weather-row {
-        margin-top: 6px;
-        font-size: 14px;
-        letter-spacing: 3px;
-        color: var(--dt-hud-fg-faint);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        white-space: nowrap;
-    }
-
-    .dt-hud-weather-icon {
-        width: 16px; height: 16px;
-        display: inline-flex; align-items: center; justify-content: center;
-        flex-shrink: 0; opacity: 0.85;
-    }
-
-    .dt-hud-weather-icon svg {
-        width: 100%; height: 100%;
-        stroke: rgba(255,255,255,0.85); fill: none;
-        stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round;
-    }
-
-    .dt-hud-temp { opacity: 0.9; }
+    /* 预览页把悬浮窗放在偏右位置，方便看到向左展开的侧栏 */
+    #dt_weather_hud_panel { top: 90px; right: 90px; }
 
     .hint {
-        position: fixed;
-        bottom: 22px;
-        left: 50%;
-        transform: translateX(-50%);
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
         color: rgba(255,255,255,0.35);
-        font-family: var(--dt-hud-font);
-        font-size: 12px;
-        letter-spacing: 1px;
+        font-family: var(--dt-hud-font); font-size: 12px; letter-spacing: 1px;
+        text-align: center; line-height: 1.7;
     }
+    .side-switch {
+        position: fixed; top: 20px; left: 20px;
+        font-family: var(--dt-hud-font); font-size: 12px;
+        color: rgba(255,255,255,0.5); letter-spacing: 1px;
+    }
+    .side-switch span {
+        cursor: pointer; padding: 4px 10px; margin-right: 4px;
+        border: 1px solid rgba(255,255,255,0.15); border-radius: 4px;
+    }
+    .side-switch span.on { color: #fff; border-color: rgba(255,255,255,0.6); }
 </style>
 </head>
 <body>
     <div class="bg-grid"></div>
 
-    <div id="dt_weather_hud_panel">
+    <div class="side-switch">
+        侧栏方向：<span id="btn-left" class="on">向左</span><span id="btn-right">向右</span>
+    </div>
+
+    <div id="dt_weather_hud_panel" class="dt-hud-drawer-left">
         <div class="dt-hud-corner dt-hud-corner-tl"></div>
         <div class="dt-hud-corner dt-hud-corner-br"></div>
 
-        <div class="dt-hud-time-row" id="drag_handle">
-            <span class="dt-hud-hour" id="hour">--</span>
-            <span class="dt-hud-colon">:</span>
-            <span class="dt-hud-minute" id="minute">--</span>
+        <div class="dt-hud-main" id="dt_weather_hud_main">
+            <div class="dt-hud-time-row">
+                <span class="dt-hud-hour" id="dt_hud_hour">--</span>
+                <span class="dt-hud-colon">:</span>
+                <span class="dt-hud-minute" id="dt_hud_minute">--</span>
+            </div>
+            <div class="dt-hud-date-row">
+                <span id="dt_hud_date">----.--.--</span>
+                <span class="dt-hud-sep">/</span>
+                <span id="dt_hud_weekday">----</span>
+            </div>
+            <div class="dt-hud-weather-row">
+                <span class="dt-hud-weather-icon" id="dt_hud_weather_icon"></span>
+                <span id="dt_hud_weather_text">--</span>
+                <span class="dt-hud-temp" id="dt_hud_temp"></span>
+            </div>
         </div>
 
-        <div class="dt-hud-date-row">
-            <span id="date">----.--.--</span>
-            <span class="dt-hud-sep">/</span>
-            <span id="weekday">-</span>
+        <div class="dt-hud-drawer" id="dt_hud_drawer">
+            <div class="dt-hud-drawer-inner">
+                <div class="dt-hud-tabs">
+                    <div class="dt-hud-tab active" data-tab="calendar">日历</div>
+                    <div class="dt-hud-tab" data-tab="scene">场景</div>
+                    <div class="dt-hud-tab" data-tab="summary">摘要</div>
+                </div>
+
+                <div class="dt-hud-tab-page active" data-page="calendar">
+                    <div class="dt-hud-cal-head">
+                        <span class="dt-hud-cal-nav" id="dt_hud_cal_prev">‹</span>
+                        <span class="dt-hud-cal-title" id="dt_hud_cal_title">----.--</span>
+                        <span class="dt-hud-cal-nav" id="dt_hud_cal_next">›</span>
+                    </div>
+                    <div class="dt-hud-cal-grid" id="dt_hud_cal_grid"></div>
+                    <div class="dt-hud-todo-head">
+                        <span id="dt_hud_todo_date">选择日期</span>
+                        <span class="dt-hud-todo-add" id="dt_hud_todo_add" title="添加待办">＋</span>
+                    </div>
+                    <div class="dt-hud-todo-list" id="dt_hud_todo_list"></div>
+                </div>
+
+                <div class="dt-hud-tab-page" data-page="scene">
+                    <div class="dt-hud-section-title">当前地点</div>
+                    <div class="dt-hud-location" id="dt_hud_location_text">—</div>
+                    <div class="dt-hud-section-title">主要人物着装</div>
+                    <div class="dt-hud-outfit-list" id="dt_hud_outfit_list"></div>
+                </div>
+
+                <div class="dt-hud-tab-page" data-page="summary">
+                    <div class="dt-hud-section-title">章节摘要</div>
+                    <div class="dt-hud-chapter-list" id="dt_hud_chapter_list"></div>
+                </div>
+            </div>
         </div>
 
-        <div class="dt-hud-weather-row">
-            <span class="dt-hud-weather-icon" id="weather-icon"></span>
-            <span id="weather-text">--</span>
-            <span class="dt-hud-temp" id="weather-temp"></span>
-        </div>
+        <div class="dt-hud-collapse-btn" id="dt_weather_hud_collapse_btn" title="折叠/展开时间">︿</div>
     </div>
 
-    <div class="hint">拖动组件可自由移动位置 · 此页面使用本机实时时钟仅作视觉演示</div>
+    <div class="hint">
+        点击时间区域展开 / 收起侧栏 · 按住时间区域可拖动组件<br>
+        以下为示例数据，实际使用时由剧情正文中的数据块自动填充
+    </div>
 
 <script>
-    // ------------------------------------------------------------
-    // 演示用：真实时钟每秒更新（冒号闪烁 + 数字跳动）
-    // 在实际 SillyTavern 扩展中，这里的数据来源是"从剧情文本中
-    // 扫描到的最后一次日期/时间/天气"，而不是系统时钟。
-    // ------------------------------------------------------------
+// ==============================================================
+// 预览页脚本：使用示例假数据演示各区域效果
+// ==============================================================
 
-    const WEEKDAY_CN = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+const WEEKDAY_CN = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+const WEEKDAY_SHORT = ['日','一','二','三','四','五','六'];
 
-    const WEATHER_ICONS = {
-        sun: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
-        cloud: '<svg viewBox="0 0 24 24"><path d="M7 17h10a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7.1 8.5 4 4 0 0 0 7 17z"/></svg>',
-        rain: '<svg viewBox="0 0 24 24"><path d="M7 13h9a3.8 3.8 0 0 0 .4-7.58A5.2 5.2 0 0 0 7.2 4.9 3.8 3.8 0 0 0 7 13z"/><path d="M8 17l-1 2.5M12 17l-1 2.5M16 17l-1 2.5"/></svg>',
-        snow: '<svg viewBox="0 0 24 24"><path d="M7 12h9a3.8 3.8 0 0 0 .4-7.58A5.2 5.2 0 0 0 7.2 3.9 3.8 3.8 0 0 0 7 12z"/><path d="M9 16v6M6 18l6 2M12 18l-6 2M15 16v6M13 18l4 2M17 18l-4 2"/></svg>',
-        moon: '<svg viewBox="0 0 24 24"><path d="M18 13.5A7 7 0 0 1 9.5 5 7.5 7.5 0 1 0 18 13.5z"/></svg>',
-    };
+const WEATHER_ICONS = {
+    sun: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+    cloud: '<svg viewBox="0 0 24 24"><path d="M7 17h10a4 4 0 0 0 .5-7.97A5.5 5.5 0 0 0 7.1 8.5 4 4 0 0 0 7 17z"/></svg>',
+    rain: '<svg viewBox="0 0 24 24"><path d="M7 13h9a3.8 3.8 0 0 0 .4-7.58A5.2 5.2 0 0 0 7.2 4.9 3.8 3.8 0 0 0 7 13z"/><path d="M8 17l-1 2.5M12 17l-1 2.5M16 17l-1 2.5"/></svg>',
+    moon: '<svg viewBox="0 0 24 24"><path d="M18 13.5A7 7 0 0 1 9.5 5 7.5 7.5 0 1 0 18 13.5z"/></svg>',
+};
 
-    function updateClock() {
-        const now = new Date();
-        const hh = String(now.getHours()).padStart(2, '0');
-        const mm = String(now.getMinutes()).padStart(2, '0');
-        const yyyy = now.getFullYear();
-        const mo = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        const hour = now.getHours();
+const COLOR_TAGS = {
+    '红':'#ff5f6d','橙':'#ff9f43','黄':'#ffd93d','绿':'#4ade80',
+    '青':'#22d3ee','蓝':'#60a5fa','紫':'#c084fc','灰':'#9ca3af'
+};
+const tagColor = (t) => COLOR_TAGS[t] || '#9ca3af';
 
-        document.getElementById('hour').textContent = hh;
-        document.getElementById('minute').textContent = mm;
-        document.getElementById('date').textContent = `${yyyy}.${mo}.${dd}`;
-        document.getElementById('weekday').textContent = WEEKDAY_CN[now.getDay()];
+// ---------- 示例数据 ----------
+const STORY = {
+    date: '2026-08-05',
+    time: '09:45',
+    weather: '晴',
+    temp: '28°C',
+    location: '老城区「灰鸽」咖啡馆二楼靠窗座位',
+    outfits: [
+        { name: '林夏', desc: '米色针织开衫，白衬衫，深蓝色长裙，左手腕银色细链表' },
+        { name: '陈默', desc: '深灰色风衣未系扣，黑色高领毛衣，同色长裤' },
+    ],
+    todos: [
+        { date: '2026-08-05', tag: '蓝', text: '与陈默核对旧档案编号', done: true },
+        { date: '2026-08-05', tag: '绿', text: '归还图书馆的城建年鉴' },
+        { date: '2026-08-08', tag: '红', text: '截止：向委员会提交调查申请' },
+        { date: '2026-08-08', tag: '橙', text: '取回冲洗好的胶卷' },
+        { date: '2026-08-14', tag: '紫', text: '母亲忌日，前往北郊墓园' },
+        { date: '2026-08-20', tag: '青', text: '与匿名来信者约定的碰面日' },
+    ],
+    chapters: [
+        { num: 1, text: '2026-08-05 08:50-09:20 灰鸽咖啡馆。林夏抵达咖啡馆，选定二楼靠窗座位。林夏取出档案袋，核对七份文件编号。陈默于09:05进入，落座对面。林夏情绪由平静转为戒备。' },
+        { num: 2, text: '2026-08-05 09:20-09:45 灰鸽咖啡馆二楼。陈默出示一张1998年的施工许可影印件。林夏确认签名栏笔迹与父亲一致。陈默陈述："这份文件本该在十年前就被销毁。"林夏沉默六秒后收起影印件。' },
+    ],
+};
 
-        // 演示：根据时间段自动切换示例天气图标（实际扩展中由剧情文本决定）
-        const isNight = hour < 6 || hour >= 19;
-        document.getElementById('weather-icon').innerHTML = isNight ? WEATHER_ICONS.moon : WEATHER_ICONS.sun;
-        document.getElementById('weather-text').textContent = isNight ? 'Clear Night' : 'Clear';
-        document.getElementById('weather-temp').textContent = '28°C';
+let cursor = { year: 2026, month: 7 }; // 8月
+let selectedDay = '2026-08-05';
+let drawerOpen = false;
+
+// ---------- 悬浮窗主体 ----------
+function renderMain() {
+    const [y, m, d] = STORY.date.split('-').map(Number);
+    const [hh, mm] = STORY.time.split(':');
+    document.getElementById('dt_hud_hour').textContent = hh;
+    document.getElementById('dt_hud_minute').textContent = mm;
+    document.getElementById('dt_hud_date').textContent = `${y}.${String(m).padStart(2,'0')}.${String(d).padStart(2,'0')}`;
+    document.getElementById('dt_hud_weekday').textContent = WEEKDAY_CN[new Date(y, m-1, d).getDay()];
+    document.getElementById('dt_hud_weather_icon').innerHTML = WEATHER_ICONS.sun;
+    document.getElementById('dt_hud_weather_text').textContent = STORY.weather;
+    document.getElementById('dt_hud_temp').textContent = STORY.temp;
+}
+
+// ---------- 月历 ----------
+function renderCalendar() {
+    const { year, month } = cursor;
+    document.getElementById('dt_hud_cal_title').textContent = `${year}.${String(month+1).padStart(2,'0')}`;
+
+    const byDate = {};
+    STORY.todos.forEach(t => { (byDate[t.date] = byDate[t.date] || []).push(t); });
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+
+    let html = WEEKDAY_SHORT.map(w => `<div class="dt-hud-cal-cell dt-hud-cal-weekday">${w}</div>`).join('');
+    for (let i = 0; i < firstDay; i++) html += '<div class="dt-hud-cal-cell dt-hud-cal-blank"></div>';
+
+    for (let d = 1; d <= daysInMonth; d++) {
+        const key = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const items = byDate[key] || [];
+        const cls = ['dt-hud-cal-cell','dt-hud-cal-day'];
+        if (key === STORY.date) cls.push('is-story-today');
+        if (key === selectedDay) cls.push('is-selected');
+        if (items.length) cls.push('has-todo');
+        const dots = items.slice(0,3).map(t => `<i style="background:${tagColor(t.tag)}"></i>`).join('');
+        html += `<div class="${cls.join(' ')}" data-date="${key}">
+            <span class="dt-hud-cal-num">${d}</span><span class="dt-hud-cal-dots">${dots}</span></div>`;
     }
+    document.getElementById('dt_hud_cal_grid').innerHTML = html;
+}
 
-    updateClock();
-    setInterval(updateClock, 1000);
+// ---------- 待办 ----------
+function renderTodos() {
+    const head = document.getElementById('dt_hud_todo_date');
+    const list = document.getElementById('dt_hud_todo_list');
+    if (!selectedDay) {
+        head.textContent = '选择日期';
+        list.innerHTML = '<div class="dt-hud-todo-empty">点击月历中的日期查看待办</div>';
+        return;
+    }
+    head.textContent = selectedDay.replace(/-/g, '.');
+    const items = STORY.todos.filter(t => t.date === selectedDay);
+    if (!items.length) {
+        list.innerHTML = '<div class="dt-hud-todo-empty">当日暂无待办</div>';
+        return;
+    }
+    list.innerHTML = items.map(t => `
+        <div class="dt-hud-todo-item ${t.done ? 'is-done' : ''}">
+            <span class="dt-hud-todo-dot" style="background:${tagColor(t.tag)}"></span>
+            <span class="dt-hud-todo-text">${t.text}</span>
+            <span class="dt-hud-todo-src">剧情</span>
+        </div>`).join('');
+}
 
-    // 简单拖动演示
-    (function makeDraggable() {
-        const panel = document.getElementById('dt_weather_hud_panel');
-        const handle = document.getElementById('drag_handle');
-        let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+// ---------- 场景 / 摘要 ----------
+function renderScene() {
+    document.getElementById('dt_hud_location_text').textContent = STORY.location;
+    document.getElementById('dt_hud_outfit_list').innerHTML = STORY.outfits.map(o => `
+        <div class="dt-hud-outfit-item">
+            <div class="dt-hud-outfit-name">${o.name}</div>
+            <div class="dt-hud-outfit-desc">${o.desc}</div>
+        </div>`).join('');
+}
 
-        handle.addEventListener('pointerdown', (e) => {
-            dragging = true;
-            panel.classList.add('dt-hud-dragging');
-            const rect = panel.getBoundingClientRect();
-            ox = rect.left; oy = rect.top;
-            sx = e.clientX; sy = e.clientY;
-            panel.style.position = 'fixed';
-            handle.setPointerCapture(e.pointerId);
+function renderChapters() {
+    document.getElementById('dt_hud_chapter_list').innerHTML =
+        [...STORY.chapters].reverse().map(c => `
+        <div class="dt-hud-chapter-item">
+            <div class="dt-hud-chapter-num">CHAPTER ${c.num}</div>
+            <div class="dt-hud-chapter-text">${c.text}</div>
+        </div>`).join('');
+}
+
+// ---------- 交互 ----------
+const panel = document.getElementById('dt_weather_hud_panel');
+const drawer = document.getElementById('dt_hud_drawer');
+
+drawer.addEventListener('pointerdown', e => e.stopPropagation());
+drawer.addEventListener('click', e => e.stopPropagation());
+
+drawer.querySelectorAll('.dt-hud-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        drawer.querySelectorAll('.dt-hud-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const name = tab.dataset.tab;
+        drawer.querySelectorAll('.dt-hud-tab-page').forEach(p => {
+            p.classList.toggle('active', p.dataset.page === name);
         });
+    });
+});
 
-        handle.addEventListener('pointermove', (e) => {
-            if (!dragging) return;
-            panel.style.left = (ox + e.clientX - sx) + 'px';
-            panel.style.top = (oy + e.clientY - sy) + 'px';
-        });
+document.getElementById('dt_hud_cal_prev').addEventListener('click', () => {
+    cursor.month--; if (cursor.month < 0) { cursor.month = 11; cursor.year--; }
+    renderCalendar();
+});
+document.getElementById('dt_hud_cal_next').addEventListener('click', () => {
+    cursor.month++; if (cursor.month > 11) { cursor.month = 0; cursor.year++; }
+    renderCalendar();
+});
 
-        const end = () => { dragging = false; panel.classList.remove('dt-hud-dragging'); };
-        handle.addEventListener('pointerup', end);
-        handle.addEventListener('pointercancel', end);
-    })();
+document.getElementById('dt_hud_cal_grid').addEventListener('click', (e) => {
+    const cell = e.target.closest('.dt-hud-cal-day');
+    if (!cell) return;
+    selectedDay = cell.dataset.date;
+    renderCalendar();
+    renderTodos();
+});
+
+document.getElementById('dt_weather_hud_collapse_btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    panel.classList.toggle('dt-hud-collapsed');
+});
+
+// 侧栏方向切换（预览专用）
+document.getElementById('btn-left').addEventListener('click', function () {
+    panel.classList.add('dt-hud-drawer-left');
+    panel.classList.remove('dt-hud-drawer-right');
+    this.classList.add('on');
+    document.getElementById('btn-right').classList.remove('on');
+});
+document.getElementById('btn-right').addEventListener('click', function () {
+    panel.classList.add('dt-hud-drawer-right');
+    panel.classList.remove('dt-hud-drawer-left');
+    this.classList.add('on');
+    document.getElementById('btn-left').classList.remove('on');
+});
+
+// 拖动 + 点击展开（与扩展中逻辑一致：位移超过阈值视为拖动，否则视为点击）
+(function () {
+    const handle = document.getElementById('dt_weather_hud_main');
+    let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
+
+    handle.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('#dt_weather_hud_collapse_btn')) return;
+        dragging = true; moved = false;
+        panel.classList.add('dt-hud-dragging');
+        const r = panel.getBoundingClientRect();
+        ox = r.left; oy = r.top; sx = e.clientX; sy = e.clientY;
+        handle.setPointerCapture(e.pointerId);
+    });
+
+    handle.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - sx, dy = e.clientY - sy;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+        if (!moved) return;
+        panel.style.left = (ox + dx) + 'px';
+        panel.style.top = (oy + dy) + 'px';
+        panel.style.right = 'auto';
+    });
+
+    const end = () => {
+        if (!dragging) return;
+        dragging = false;
+        panel.classList.remove('dt-hud-dragging');
+        if (!moved) {
+            drawerOpen = !drawerOpen;
+            panel.classList.toggle('dt-hud-drawer-open', drawerOpen);
+        }
+    };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+})();
+
+renderMain();
+renderCalendar();
+renderTodos();
+renderScene();
+renderChapters();
 </script>
 </body>
 </html>
