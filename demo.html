@@ -42,6 +42,19 @@
         border: 1px solid rgba(255,255,255,0.15); border-radius: 4px;
     }
     .side-switch span.on { color: #fff; border-color: rgba(255,255,255,0.6); }
+
+    /* 浅色背景：模拟 SillyTavern 使用亮色背景图的情况 */
+    body.light-bg {
+        background: linear-gradient(140deg, #e8eef5 0%, #cfd8e3 45%, #f2ede4 100%);
+    }
+    body.light-bg .bg-grid {
+        background-image:
+            linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+    }
+    body.light-bg .hint, body.light-bg .side-switch { color: rgba(0,0,0,0.5); }
+    body.light-bg .side-switch span { border-color: rgba(0,0,0,0.2); }
+    body.light-bg .side-switch span.on { color: #000; border-color: rgba(0,0,0,0.5); }
 </style>
 </head>
 <body>
@@ -49,6 +62,7 @@
 
     <div class="side-switch">
         侧栏方向：<span id="btn-left" class="on">向左</span><span id="btn-right">向右</span>
+        &nbsp;&nbsp;背景：<span id="bg-dark" class="on">深色</span><span id="bg-light">浅色</span>
     </div>
 
     <div id="dt_weather_hud_panel" class="dt-hud-drawer-left">
@@ -242,12 +256,13 @@ function renderScene() {
 }
 
 function renderChapters() {
-    document.getElementById('dt_hud_chapter_list').innerHTML =
-        [...STORY.chapters].reverse().map(c => `
+    // 只显示最后一条章节摘要
+    const c = STORY.chapters[STORY.chapters.length - 1];
+    document.getElementById('dt_hud_chapter_list').innerHTML = c ? `
         <div class="dt-hud-chapter-item">
             <div class="dt-hud-chapter-num">CHAPTER ${c.num}</div>
             <div class="dt-hud-chapter-text">${c.text}</div>
-        </div>`).join('');
+        </div>` : '<div class="dt-hud-todo-empty">暂无章节摘要</div>';
 }
 
 // ---------- 交互 ----------
@@ -288,6 +303,18 @@ document.getElementById('dt_hud_cal_grid').addEventListener('click', (e) => {
 document.getElementById('dt_weather_hud_collapse_btn').addEventListener('click', (e) => {
     e.stopPropagation();
     panel.classList.toggle('dt-hud-collapsed');
+});
+
+// 背景切换（预览专用）：用于验证浅色背景下的文字可读性
+document.getElementById('bg-dark').addEventListener('click', function () {
+    document.body.classList.remove('light-bg');
+    this.classList.add('on');
+    document.getElementById('bg-light').classList.remove('on');
+});
+document.getElementById('bg-light').addEventListener('click', function () {
+    document.body.classList.add('light-bg');
+    this.classList.add('on');
+    document.getElementById('bg-dark').classList.remove('on');
 });
 
 // 侧栏方向切换（预览专用）

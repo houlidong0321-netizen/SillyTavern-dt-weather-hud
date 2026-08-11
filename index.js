@@ -87,7 +87,7 @@ const ROLE_FALLBACK = { SYSTEM: 0, USER: 1, ASSISTANT: 2 };
 let lastInfo = null;        // { date, time, weather, index }
 let lastLocation = '';      // 当前地点
 let lastOutfits = [];       // [{ name, desc }]
-let chapters = [];          // [{ num, text, raw }]
+let lastChapter = null;     // 只保留最后一条章节摘要 { num, text, index }
 let parsedTodos = [];       // 从正文解析出的待办 [{ date, tag, text, source:'ai' }]
 let calendarCursor = null;  // { year, month }  当前月历显示的月份（month 从 0 开始）
 let selectedDay = null;     // 'YYYY-MM-DD'
@@ -165,7 +165,7 @@ function buildPromptText() {
     const settings = getSettings();
     const now = new Date();
     const fallbackDate = now.toISOString().slice(0, 10);
-    const nextChapter = chapters.length ? (Math.max(...chapters.map(c => c.num)) + 1) : 1;
+    const nextChapter = lastChapter ? (lastChapter.num + 1) : 1;
 
     const lines = [];
     lines.push('【系统指令：章节结构化数据块】');
@@ -277,13 +277,12 @@ function scanChat() {
     lastInfo = null;
     lastLocation = '';
     lastOutfits = [];
-    chapters = [];
+    lastChapter = null;
     parsedTodos = [];
 
     const todoSeen = new Set();
-    const chapterSeen = new Set();
 
-    // 从后往前找"最后一条"的时间/地点/着装
+    // 从后往前找"最后一条"的时间/地点/着装/章节摘要
     for (let i = chat.length - 1; i >= 0; i--) {
         const mes = chat[i];
         if (!mes || typeof mes.mes !== 'string') continue;
@@ -303,10 +302,19 @@ function scanChat() {
             const m = text.match(OUTFIT_REGEX);
             if (m) lastOutfits = parseOutfitString(m[1]);
         }
-        if (lastInfo && lastLocation && lastOutfits.length) break;
+        if (!lastChapter) {
+            // 同一条消息内若有多个章节标记，取最后出现的那个
+            CHAPTER_REGEX_G.lastIndex = 0;
+            let cm, found = null;
+            while ((cm = CHAPTER_REGEX_G.exec(text)) !== null) {
+                found = { num: Number(cm[1]), text: cm[2].trim(), index: i };
+            }
+            if (found) lastChapter = found;
+        }
+        if (lastInfo && lastLocation && lastOutfits.length && lastChapter) break;
     }
 
-    // 从前往后累积待办与章节摘要（保持时间顺序）
+    // 待办需要全量累积（是历史清单，不是状态快照）
     for (let i = 0; i < chat.length; i++) {
         const mes = chat[i];
         if (!mes || typeof mes.mes !== 'string') continue;
@@ -324,20 +332,7 @@ function scanChat() {
             todoSeen.add(key);
             parsedTodos.push({ date: dateKey, tag, text: content, source: 'ai', done: false });
         }
-
-        CHAPTER_REGEX_G.lastIndex = 0;
-        let cm;
-        while ((cm = CHAPTER_REGEX_G.exec(text)) !== null) {
-            const num = Number(cm[1]);
-            const body = cm[2].trim();
-            const key = `${num}||${body.slice(0, 30)}`;
-            if (chapterSeen.has(key)) continue;
-            chapterSeen.add(key);
-            chapters.push({ num, text: body, index: i });
-        }
     }
-
-    chapters.sort((a, b) => a.num - b.num);
 }
 
 function rescanAndUpdate() {
@@ -774,18 +769,16 @@ function renderScene() {
 
 function renderChapters() {
     const $list = $('#dt_hud_chapter_list');
-    if (!chapters.length) {
+    if (!lastChapter) {
         $list.html('<div class="dt-hud-todo-empty">暂无章节摘要</div>');
         return;
     }
-    // 最新的排在最上面
-    const html = [...chapters].reverse().map(c => `
+    $list.html(`
         <div class="dt-hud-chapter-item">
-            <div class="dt-hud-chapter-num">CHAPTER ${c.num}</div>
-            <div class="dt-hud-chapter-text">${escapeHtml(c.text)}</div>
+            <div class="dt-hud-chapter-num">CHAPTER ${lastChapter.num}</div>
+            <div class="dt-hud-chapter-text">${escapeHtml(lastChapter.text)}</div>
         </div>
-    `).join('');
-    $list.html(html);
+    `);
 }
 
 // ================= 侧栏交互 =================

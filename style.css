@@ -1,23 +1,37 @@
 /* ==========================================================
-   剧情时间天气悬浮窗 - 默认样式
-   风格：Transparent HUD / macOS 小组件 / 玻璃拟态 / 极简科技感
-   完全透明背景，仅保留文字、细线、微弱发光。不使用任何 emoji 或位图。
-   用户可在扩展设置中导入自定义 CSS 覆盖以下全部样式。
+   剧情时间天气悬浮窗 + 侧边信息栏 — 默认样式 v3.1
+   风格：Transparent HUD / 极简玻璃拟态 / 无实心卡片
+   ----------------------------------------------------------
+   v3.1 关键修复：
+   1. 深色/浅色背景通用可读性 —— 所有文字加暗色描边光晕，
+      次要文字不透明度上调，不再依赖"背景一定是深色"这个假设。
+   2. 抵抗 SillyTavern 主题 CSS 污染 —— 组件内做局部 reset，
+      选择器统一提升到 #dt_weather_hud_panel 前缀。
+   3. 侧栏底色改为纵向渐变 + 强模糊，保持通透但保证文字不糊。
    ========================================================== */
 
-:root {
-    --dt-hud-fg: rgba(255, 255, 255, 0.92);
-    --dt-hud-fg-dim: rgba(255, 255, 255, 0.62);
-    --dt-hud-fg-faint: rgba(255, 255, 255, 0.4);
-    --dt-hud-glow: rgba(255, 255, 255, 0.55);
-    --dt-hud-line: rgba(255, 255, 255, 0.85);
+#dt_weather_hud_panel {
+    /* ---- 可调变量：改这里就能整体换风格 ---- */
+    --dt-hud-fg: rgba(255, 255, 255, 0.98);
+    --dt-hud-fg-dim: rgba(255, 255, 255, 0.82);
+    --dt-hud-fg-faint: rgba(255, 255, 255, 0.62);
+    --dt-hud-glow: rgba(255, 255, 255, 0.5);
+    --dt-hud-line: rgba(255, 255, 255, 0.9);
+    --dt-hud-hairline: rgba(255, 255, 255, 0.18);
+
+    /* 暗色描边光晕：让白字在任何背景（含亮色照片）上都可读 */
+    --dt-hud-halo: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.55);
+    --dt-hud-halo-strong: 0 2px 5px rgba(0, 0, 0, 0.95), 0 0 18px rgba(0, 0, 0, 0.65);
+
+    /* 侧栏底：纵向渐变 + 强模糊，通透但不糊字 */
+    --dt-hud-drawer-bg: linear-gradient(160deg, rgba(8, 10, 16, 0.52), rgba(8, 10, 16, 0.34));
+    --dt-hud-drawer-blur: 20px;
+
     --dt-hud-time-size: clamp(46px, 7vw, 78px);
     --dt-hud-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue",
-        "PingFang SC", "Segoe UI", Arial, sans-serif;
-}
+        "PingFang SC", "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
 
-/* ---------- 悬浮窗容器：完全透明，无卡片、无实色背景 ---------- */
-#dt_weather_hud_panel {
+    /* ---- 容器本体：完全透明 ---- */
     position: fixed;
     top: 60px;
     right: 40px;
@@ -25,9 +39,6 @@
     min-width: 220px;
     padding: 22px 30px 18px 30px;
     background: transparent;
-    /* 允许轻微背景折射但不产生明显色块 */
-    backdrop-filter: blur(1.5px);
-    -webkit-backdrop-filter: blur(1.5px);
     border: none;
     box-shadow: none;
     border-radius: 4px;
@@ -35,9 +46,26 @@
     font-family: var(--dt-hud-font);
     text-align: center;
     user-select: none;
-    cursor: grab;
     animation: dtHudBreathe 6s ease-in-out infinite;
     transition: opacity 0.25s ease;
+}
+
+/* ---- 局部 reset：阻断 SillyTavern 主题对组件内部元素的影响 ---- */
+#dt_weather_hud_panel,
+#dt_weather_hud_panel * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    background-image: none;
+    text-transform: none;
+    font-family: inherit;
+}
+
+#dt_weather_hud_panel * {
+    border: 0 none;
+    box-shadow: none;
+    outline: none;
+    line-height: normal;
 }
 
 #dt_weather_hud_panel.dt-hud-dragging {
@@ -45,14 +73,15 @@
     animation-play-state: paused;
 }
 
-/* 呼吸感：整个组件轻微上下漂浮 */
 @keyframes dtHudBreathe {
     0%, 100% { transform: translateY(0); }
     50%      { transform: translateY(-5px); }
 }
 
-/* ---------- 角框装饰：左上 L 型 / 右下反 L 型 ---------- */
-.dt-hud-corner {
+/* ==========================================================
+   角框装饰
+   ========================================================== */
+#dt_weather_hud_panel .dt-hud-corner {
     position: absolute;
     width: 20px;
     height: 20px;
@@ -60,22 +89,21 @@
     pointer-events: none;
     animation: dtCornerFadeIn 1.4s ease forwards;
     animation-delay: 0.5s;
+    filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8));
 }
 
-.dt-hud-corner-tl {
+#dt_weather_hud_panel .dt-hud-corner-tl {
     top: -8px;
     left: -8px;
     border-top: 1px solid var(--dt-hud-line);
     border-left: 1px solid var(--dt-hud-line);
-    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
 }
 
-.dt-hud-corner-br {
+#dt_weather_hud_panel .dt-hud-corner-br {
     bottom: -8px;
     right: -8px;
     border-bottom: 1px solid var(--dt-hud-line);
     border-right: 1px solid var(--dt-hud-line);
-    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.35));
 }
 
 @keyframes dtCornerFadeIn {
@@ -83,8 +111,14 @@
     to   { opacity: 1; }
 }
 
-/* ---------- 时间主体：超大数字 + 动态冒号 ---------- */
-.dt-hud-time-row {
+/* ==========================================================
+   悬浮窗主体：时间 / 日期 / 天气
+   ========================================================== */
+#dt_weather_hud_panel .dt-hud-main {
+    cursor: pointer;
+}
+
+#dt_weather_hud_panel .dt-hud-time-row {
     display: flex;
     align-items: baseline;
     justify-content: center;
@@ -93,35 +127,37 @@
     letter-spacing: 2px;
     line-height: 1;
     color: var(--dt-hud-fg);
-    text-shadow: 0 0 14px var(--dt-hud-glow), 0 0 2px rgba(255, 255, 255, 0.8);
     font-variant-numeric: tabular-nums;
+    /* 白色发光 + 暗色描边，两种背景都清晰 */
+    text-shadow:
+        0 2px 6px rgba(0, 0, 0, 0.9),
+        0 0 22px rgba(0, 0, 0, 0.6),
+        0 0 16px var(--dt-hud-glow);
 }
 
-.dt-hud-hour,
-.dt-hud-minute {
+#dt_weather_hud_panel .dt-hud-hour,
+#dt_weather_hud_panel .dt-hud-minute {
     min-width: 1.1ch;
 }
 
-.dt-hud-colon {
+#dt_weather_hud_panel .dt-hud-colon {
     display: inline-block;
     margin: 0 2px;
     animation: dtColonBlink 1s ease-in-out infinite;
 }
 
-/* 冒号每秒闪烁一次，仅影响冒号本身，渐隐渐现 */
 @keyframes dtColonBlink {
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.12; }
 }
 
-/* ---------- 日期行 ---------- */
-.dt-hud-date-row {
+#dt_weather_hud_panel .dt-hud-date-row {
     margin-top: 6px;
     font-size: 12px;
-    font-weight: 400;
+    font-weight: 500;
     letter-spacing: 3px;
-    text-transform: uppercase;
     color: var(--dt-hud-fg-dim);
+    text-shadow: var(--dt-hud-halo);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -129,18 +165,18 @@
     white-space: nowrap;
 }
 
-.dt-hud-date-row .dt-hud-sep {
-    opacity: 0.5;
+#dt_weather_hud_panel .dt-hud-date-row .dt-hud-sep {
+    opacity: 0.6;
     font-size: 10px;
 }
 
-/* ---------- 天气行 ---------- */
-.dt-hud-weather-row {
+#dt_weather_hud_panel .dt-hud-weather-row {
     margin-top: 4px;
     font-size: 12px;
-    font-weight: 400;
+    font-weight: 500;
     letter-spacing: 2px;
     color: var(--dt-hud-fg-faint);
+    text-shadow: var(--dt-hud-halo);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -148,38 +184,39 @@
     white-space: nowrap;
 }
 
-.dt-hud-weather-icon {
+#dt_weather_hud_panel .dt-hud-weather-icon {
     width: 14px;
     height: 14px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    opacity: 0.85;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
 }
 
-.dt-hud-weather-icon svg {
+#dt_weather_hud_panel .dt-hud-weather-icon svg {
     width: 100%;
     height: 100%;
-    stroke: rgba(255, 255, 255, 0.85);
+    stroke: rgba(255, 255, 255, 0.95);
     fill: none;
-    stroke-width: 1.4;
+    stroke-width: 1.5;
     stroke-linecap: round;
     stroke-linejoin: round;
 }
 
-.dt-hud-temp {
-    opacity: 0.9;
+#dt_weather_hud_panel .dt-hud-temp {
+    opacity: 0.95;
 }
 
-/* ---------- 折叠按钮：极简，默认隐藏，悬停显现 ---------- */
-.dt-hud-collapse-btn {
+/* 折叠按钮 */
+#dt_weather_hud_panel .dt-hud-collapse-btn {
     position: absolute;
     bottom: -4px;
     left: 50%;
     transform: translateX(-50%);
     font-size: 10px;
     color: var(--dt-hud-fg-faint);
+    text-shadow: var(--dt-hud-halo);
     opacity: 0;
     cursor: pointer;
     padding: 4px 10px;
@@ -187,30 +224,383 @@
     letter-spacing: 1px;
 }
 
-#dt_weather_hud_panel:hover .dt-hud-collapse-btn {
-    opacity: 0.6;
-}
+#dt_weather_hud_panel:hover .dt-hud-collapse-btn { opacity: 0.75; }
+#dt_weather_hud_panel .dt-hud-collapse-btn:hover { opacity: 1; }
 
-.dt-hud-collapse-btn:hover {
-    opacity: 1 !important;
-}
-
-/* 折叠状态：仅保留时间，隐藏日期/天气行 */
 #dt_weather_hud_panel.dt-hud-collapsed .dt-hud-date-row,
 #dt_weather_hud_panel.dt-hud-collapsed .dt-hud-weather-row {
     display: none;
 }
 
-#dt_weather_hud_panel.dt-hud-collapsed {
-    padding-bottom: 10px;
+#dt_weather_hud_panel.dt-hud-collapsed { padding-bottom: 10px; }
+
+#dt_weather_hud_panel .dt-hud-empty { opacity: 0.5; }
+
+/* ==========================================================
+   侧边展开栏
+   ========================================================== */
+#dt_weather_hud_panel.dt-hud-drawer-open {
+    animation-play-state: paused;
 }
 
-/* 空数据占位状态：更淡一些，提示尚未识别到信息 */
-.dt-hud-empty {
-    opacity: 0.45;
+#dt_weather_hud_panel .dt-hud-drawer {
+    position: absolute;
+    top: 0;
+    width: 272px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    color: var(--dt-hud-fg);
+    text-align: left;
+    cursor: default;
 }
 
-/* ---------- 设置面板内部小样式（后台，不属于悬浮窗本身） ---------- */
+#dt_weather_hud_panel.dt-hud-drawer-left .dt-hud-drawer {
+    right: calc(100% + 6px);
+    transform-origin: top right;
+    transform: translateX(10px) scale(0.97);
+}
+
+#dt_weather_hud_panel.dt-hud-drawer-right .dt-hud-drawer {
+    left: calc(100% + 6px);
+    transform-origin: top left;
+    transform: translateX(-10px) scale(0.97);
+}
+
+#dt_weather_hud_panel.dt-hud-drawer-open .dt-hud-drawer {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0) scale(1);
+}
+
+#dt_weather_hud_panel .dt-hud-drawer-inner {
+    padding: 14px 16px 16px 16px;
+    max-height: 68vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid var(--dt-hud-hairline);
+    border-radius: 8px;
+    background: var(--dt-hud-drawer-bg);
+    backdrop-filter: blur(var(--dt-hud-drawer-blur)) saturate(115%);
+    -webkit-backdrop-filter: blur(var(--dt-hud-drawer-blur)) saturate(115%);
+}
+
+#dt_weather_hud_panel .dt-hud-drawer-inner::-webkit-scrollbar { width: 3px; }
+#dt_weather_hud_panel .dt-hud-drawer-inner::-webkit-scrollbar-track { background: transparent; }
+#dt_weather_hud_panel .dt-hud-drawer-inner::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 3px;
+}
+
+/* ---------- 标签页 ---------- */
+#dt_weather_hud_panel .dt-hud-tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--dt-hud-hairline);
+}
+
+#dt_weather_hud_panel .dt-hud-tab {
+    flex: 1 1 0;
+    text-align: center;
+    padding: 6px 0 8px 0;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    /* 关键修复：未选中标签原先只有 0.4 不透明度，亮背景上等于隐形 */
+    color: var(--dt-hud-fg-faint);
+    text-shadow: var(--dt-hud-halo);
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.2s ease, border-color 0.2s ease;
+    white-space: nowrap;
+}
+
+#dt_weather_hud_panel .dt-hud-tab:hover { color: var(--dt-hud-fg-dim); }
+
+#dt_weather_hud_panel .dt-hud-tab.active {
+    color: var(--dt-hud-fg);
+    border-bottom-color: rgba(255, 255, 255, 0.85);
+}
+
+#dt_weather_hud_panel .dt-hud-tab-page { display: none; }
+#dt_weather_hud_panel .dt-hud-tab-page.active { display: block; }
+
+/* ---------- 月历 ---------- */
+#dt_weather_hud_panel .dt-hud-cal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+#dt_weather_hud_panel .dt-hud-cal-title {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    color: var(--dt-hud-fg);
+    text-shadow: var(--dt-hud-halo);
+    font-variant-numeric: tabular-nums;
+}
+
+#dt_weather_hud_panel .dt-hud-cal-nav {
+    cursor: pointer;
+    padding: 2px 10px;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--dt-hud-fg-faint);
+    text-shadow: var(--dt-hud-halo);
+    transition: color 0.2s ease;
+}
+
+#dt_weather_hud_panel .dt-hud-cal-nav:hover { color: var(--dt-hud-fg); }
+
+#dt_weather_hud_panel .dt-hud-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+#dt_weather_hud_panel .dt-hud-cal-cell {
+    position: relative;
+    height: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    border-radius: 4px;
+    text-shadow: var(--dt-hud-halo);
+}
+
+#dt_weather_hud_panel .dt-hud-cal-weekday {
+    height: 20px;
+    color: var(--dt-hud-fg-faint);
+    font-size: 10px;
+    letter-spacing: 0;
+}
+
+#dt_weather_hud_panel .dt-hud-cal-blank { visibility: hidden; }
+
+#dt_weather_hud_panel .dt-hud-cal-day {
+    color: var(--dt-hud-fg-dim);
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+#dt_weather_hud_panel .dt-hud-cal-day:hover {
+    color: var(--dt-hud-fg);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#dt_weather_hud_panel .dt-hud-cal-day.is-story-today .dt-hud-cal-num {
+    color: #fff;
+    font-weight: 700;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+#dt_weather_hud_panel .dt-hud-cal-day.is-selected {
+    border-color: rgba(255, 255, 255, 0.7);
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+#dt_weather_hud_panel .dt-hud-cal-num { line-height: 1; }
+
+#dt_weather_hud_panel .dt-hud-cal-dots {
+    display: flex;
+    gap: 2px;
+    margin-top: 3px;
+    height: 4px;
+    align-items: center;
+}
+
+#dt_weather_hud_panel .dt-hud-cal-dots i {
+    display: block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- 待办 ---------- */
+#dt_weather_hud_panel .dt-hud-todo-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 14px 0 6px 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--dt-hud-hairline);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    color: var(--dt-hud-fg-dim);
+    text-shadow: var(--dt-hud-halo);
+}
+
+#dt_weather_hud_panel .dt-hud-todo-add {
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 0 4px;
+    color: var(--dt-hud-fg-faint);
+    transition: color 0.2s ease;
+}
+
+#dt_weather_hud_panel .dt-hud-todo-add:hover { color: var(--dt-hud-fg); }
+
+#dt_weather_hud_panel .dt-hud-todo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#dt_weather_hud_panel .dt-hud-todo-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--dt-hud-fg-dim);
+    text-shadow: var(--dt-hud-halo);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+#dt_weather_hud_panel .dt-hud-todo-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--dt-hud-fg);
+}
+
+#dt_weather_hud_panel .dt-hud-todo-item.is-done .dt-hud-todo-text {
+    text-decoration: line-through;
+    opacity: 0.5;
+}
+
+#dt_weather_hud_panel .dt-hud-todo-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.6);
+}
+
+#dt_weather_hud_panel .dt-hud-todo-text {
+    flex: 1;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+#dt_weather_hud_panel .dt-hud-todo-src {
+    font-size: 9px;
+    opacity: 0.55;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+}
+
+#dt_weather_hud_panel .dt-hud-todo-del {
+    cursor: pointer;
+    opacity: 0.5;
+    font-size: 13px;
+    padding: 0 2px;
+    flex-shrink: 0;
+}
+
+#dt_weather_hud_panel .dt-hud-todo-del:hover { opacity: 1; }
+
+#dt_weather_hud_panel .dt-hud-todo-empty {
+    font-size: 11px;
+    color: var(--dt-hud-fg-faint);
+    text-shadow: var(--dt-hud-halo);
+    padding: 8px 2px;
+    letter-spacing: 1px;
+}
+
+/* ---------- 场景页 ---------- */
+#dt_weather_hud_panel .dt-hud-section-title {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    color: var(--dt-hud-fg-faint);
+    text-shadow: var(--dt-hud-halo);
+    margin: 4px 0 6px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--dt-hud-hairline);
+}
+
+#dt_weather_hud_panel .dt-hud-section-title:not(:first-child) { margin-top: 16px; }
+
+#dt_weather_hud_panel .dt-hud-location {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--dt-hud-fg);
+    text-shadow: var(--dt-hud-halo);
+    letter-spacing: 1px;
+}
+
+#dt_weather_hud_panel .dt-hud-outfit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+#dt_weather_hud_panel .dt-hud-outfit-item {
+    padding-left: 8px;
+    border-left: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+#dt_weather_hud_panel .dt-hud-outfit-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--dt-hud-fg);
+    text-shadow: var(--dt-hud-halo);
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+}
+
+#dt_weather_hud_panel .dt-hud-outfit-desc {
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--dt-hud-fg-dim);
+    text-shadow: var(--dt-hud-halo);
+}
+
+/* ---------- 摘要页 ---------- */
+#dt_weather_hud_panel .dt-hud-chapter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#dt_weather_hud_panel .dt-hud-chapter-item {
+    padding-left: 9px;
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+#dt_weather_hud_panel .dt-hud-chapter-num {
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    color: var(--dt-hud-fg-faint);
+    text-shadow: var(--dt-hud-halo);
+    margin-bottom: 3px;
+}
+
+#dt_weather_hud_panel .dt-hud-chapter-text {
+    font-size: 11px;
+    line-height: 1.65;
+    color: var(--dt-hud-fg-dim);
+    text-shadow: var(--dt-hud-halo);
+    word-break: break-word;
+}
+
+/* ==========================================================
+   后台设置面板（不属于悬浮窗，沿用 ST 主题样式）
+   ========================================================== */
 .dt-hud-settings-block .flex-container {
     align-items: center;
     gap: 8px;
@@ -234,369 +624,4 @@
     gap: 8px;
     flex-wrap: wrap;
     margin-top: 6px;
-}
-
-/* ==========================================================
-   v3 新增：侧边展开栏（月历 / 待办 / 场景 / 摘要）
-   延续透明 HUD 风格：无实色卡片，仅细线、微弱底噪与发光
-   ========================================================== */
-
-/* 悬浮窗主体区域（时间+日期+天气），点击它可展开侧栏 */
-.dt-hud-main {
-    cursor: pointer;
-}
-
-#dt_weather_hud_panel.dt-hud-drawer-open {
-    /* 侧栏展开时停止呼吸浮动，避免内容跟着晃 */
-    animation-play-state: paused;
-}
-
-/* ---------- 侧栏容器 ---------- */
-.dt-hud-drawer {
-    position: absolute;
-    top: 0;
-    width: 268px;
-    max-height: 70vh;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(0) scale(0.97);
-    transform-origin: top center;
-    transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-    background: transparent;
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-    color: var(--dt-hud-fg);
-    font-family: var(--dt-hud-font);
-    text-align: left;
-    cursor: default;
-}
-
-/* 展开方向：向左（关闭态从右侧微微滑入） */
-#dt_weather_hud_panel.dt-hud-drawer-left .dt-hud-drawer {
-    right: calc(100% + 6px);
-    transform-origin: top right;
-    transform: translateX(10px) scale(0.97);
-}
-
-/* 展开方向：向右（关闭态从左侧微微滑入） */
-#dt_weather_hud_panel.dt-hud-drawer-right .dt-hud-drawer {
-    left: calc(100% + 6px);
-    transform-origin: top left;
-    transform: translateX(-10px) scale(0.97);
-}
-
-/* 展开态：归位 */
-#dt_weather_hud_panel.dt-hud-drawer-left.dt-hud-drawer-open .dt-hud-drawer,
-#dt_weather_hud_panel.dt-hud-drawer-right.dt-hud-drawer-open .dt-hud-drawer {
-    transform: translateX(0) scale(1);
-}
-
-#dt_weather_hud_panel.dt-hud-drawer-open .dt-hud-drawer {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.dt-hud-drawer-inner {
-    padding: 14px 16px 16px 16px;
-    max-height: 70vh;
-    overflow-y: auto;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
-    /* 极淡的底噪，保证深色/浅色背景下文字都能看清，但不形成明显色块 */
-    background: rgba(10, 12, 18, 0.28);
-}
-
-/* 细滚动条 */
-.dt-hud-drawer-inner::-webkit-scrollbar { width: 3px; }
-.dt-hud-drawer-inner::-webkit-scrollbar-track { background: transparent; }
-.dt-hud-drawer-inner::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.18);
-    border-radius: 3px;
-}
-
-/* ---------- 标签页 ---------- */
-.dt-hud-tabs {
-    display: flex;
-    gap: 2px;
-    margin-bottom: 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.dt-hud-tab {
-    flex: 1;
-    text-align: center;
-    padding: 6px 0 8px 0;
-    font-size: 12px;
-    letter-spacing: 2px;
-    color: var(--dt-hud-fg-faint);
-    cursor: pointer;
-    border-bottom: 1px solid transparent;
-    margin-bottom: -1px;
-    transition: color 0.2s ease, border-color 0.2s ease;
-}
-
-.dt-hud-tab:hover { color: var(--dt-hud-fg-dim); }
-
-.dt-hud-tab.active {
-    color: var(--dt-hud-fg);
-    border-bottom-color: rgba(255, 255, 255, 0.75);
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
-}
-
-.dt-hud-tab-page { display: none; }
-.dt-hud-tab-page.active { display: block; }
-
-/* ---------- 月历 ---------- */
-.dt-hud-cal-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-}
-
-.dt-hud-cal-title {
-    font-size: 14px;
-    letter-spacing: 3px;
-    color: var(--dt-hud-fg);
-    font-variant-numeric: tabular-nums;
-}
-
-.dt-hud-cal-nav {
-    cursor: pointer;
-    padding: 2px 10px;
-    font-size: 16px;
-    line-height: 1;
-    color: var(--dt-hud-fg-faint);
-    transition: color 0.2s ease;
-    user-select: none;
-}
-.dt-hud-cal-nav:hover { color: var(--dt-hud-fg); }
-
-.dt-hud-cal-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 2px;
-}
-
-.dt-hud-cal-cell {
-    position: relative;
-    height: 30px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    border-radius: 4px;
-}
-
-.dt-hud-cal-weekday {
-    height: 20px;
-    color: var(--dt-hud-fg-faint);
-    font-size: 10px;
-    letter-spacing: 0;
-}
-
-.dt-hud-cal-blank { visibility: hidden; }
-
-.dt-hud-cal-day {
-    color: var(--dt-hud-fg-dim);
-    cursor: pointer;
-    border: 1px solid transparent;
-    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-}
-
-.dt-hud-cal-day:hover {
-    color: var(--dt-hud-fg);
-    background: rgba(255, 255, 255, 0.06);
-}
-
-/* 剧情"今天" */
-.dt-hud-cal-day.is-story-today .dt-hud-cal-num {
-    color: #fff;
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
-    font-weight: 600;
-}
-
-/* 选中日期 */
-.dt-hud-cal-day.is-selected {
-    border-color: rgba(255, 255, 255, 0.55);
-    color: #fff;
-}
-
-.dt-hud-cal-num { line-height: 1; }
-
-.dt-hud-cal-dots {
-    display: flex;
-    gap: 2px;
-    margin-top: 3px;
-    height: 4px;
-    align-items: center;
-}
-
-.dt-hud-cal-dots i {
-    display: block;
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    box-shadow: 0 0 4px currentColor;
-}
-
-/* ---------- 待办列表 ---------- */
-.dt-hud-todo-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin: 14px 0 6px 0;
-    padding-top: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    font-size: 12px;
-    letter-spacing: 2px;
-    color: var(--dt-hud-fg-dim);
-}
-
-.dt-hud-todo-add {
-    cursor: pointer;
-    font-size: 15px;
-    line-height: 1;
-    padding: 0 4px;
-    color: var(--dt-hud-fg-faint);
-    transition: color 0.2s ease;
-}
-.dt-hud-todo-add:hover { color: var(--dt-hud-fg); }
-
-.dt-hud-todo-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.dt-hud-todo-item {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 5px 6px;
-    border-radius: 4px;
-    font-size: 12px;
-    color: var(--dt-hud-fg-dim);
-    cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
-}
-
-.dt-hud-todo-item:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--dt-hud-fg);
-}
-
-.dt-hud-todo-item.is-done .dt-hud-todo-text {
-    text-decoration: line-through;
-    opacity: 0.45;
-}
-
-.dt-hud-todo-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    box-shadow: 0 0 5px currentColor;
-}
-
-.dt-hud-todo-text {
-    flex: 1;
-    line-height: 1.4;
-    word-break: break-word;
-}
-
-.dt-hud-todo-src {
-    font-size: 9px;
-    opacity: 0.4;
-    letter-spacing: 1px;
-    flex-shrink: 0;
-}
-
-.dt-hud-todo-del {
-    cursor: pointer;
-    opacity: 0.35;
-    font-size: 13px;
-    padding: 0 2px;
-    flex-shrink: 0;
-}
-.dt-hud-todo-del:hover { opacity: 1; }
-
-.dt-hud-todo-empty {
-    font-size: 11px;
-    color: var(--dt-hud-fg-faint);
-    padding: 8px 2px;
-    letter-spacing: 1px;
-}
-
-/* ---------- 场景页：地点 / 着装 ---------- */
-.dt-hud-section-title {
-    font-size: 10px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--dt-hud-fg-faint);
-    margin: 4px 0 6px 0;
-    padding-bottom: 4px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.dt-hud-section-title:not(:first-child) { margin-top: 16px; }
-
-.dt-hud-location {
-    font-size: 14px;
-    line-height: 1.5;
-    color: var(--dt-hud-fg);
-    letter-spacing: 1px;
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
-}
-
-.dt-hud-outfit-list {
-    display: flex;
-    flex-direction: column;
-    gap: 9px;
-}
-
-.dt-hud-outfit-item {
-    padding-left: 8px;
-    border-left: 1px solid rgba(255, 255, 255, 0.25);
-}
-
-.dt-hud-outfit-name {
-    font-size: 12px;
-    color: var(--dt-hud-fg);
-    letter-spacing: 1px;
-    margin-bottom: 2px;
-}
-
-.dt-hud-outfit-desc {
-    font-size: 11px;
-    line-height: 1.5;
-    color: var(--dt-hud-fg-dim);
-}
-
-/* ---------- 摘要页 ---------- */
-.dt-hud-chapter-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.dt-hud-chapter-item {
-    padding-left: 9px;
-    border-left: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.dt-hud-chapter-num {
-    font-size: 9px;
-    letter-spacing: 2px;
-    color: var(--dt-hud-fg-faint);
-    margin-bottom: 3px;
-}
-
-.dt-hud-chapter-text {
-    font-size: 11px;
-    line-height: 1.6;
-    color: var(--dt-hud-fg-dim);
-    word-break: break-word;
 }
