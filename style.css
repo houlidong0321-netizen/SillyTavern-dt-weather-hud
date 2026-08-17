@@ -625,3 +625,79 @@
     flex-wrap: wrap;
     margin-top: 6px;
 }
+
+/* ============ Ego 小助手集成 ============ */
+.dt-hud-ego-block { margin-bottom: 10px; }
+
+.dt-hud-ego-open {
+    float: right;
+    font-size: 11px;
+    font-weight: normal;
+    opacity: 0.75;
+    cursor: pointer;
+    padding: 1px 7px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+}
+.dt-hud-ego-open:hover { opacity: 1; background: rgba(255, 255, 255, 0.16); }
+
+.dt-hud-ego-event {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.6;
+}
+.dt-hud-ego-title { font-weight: 600; margin-bottom: 3px; }
+.dt-hud-ego-core { opacity: 0.75; font-size: 11.5px; margin-bottom: 5px; }
+
+.dt-hud-ego-branch {
+    font-size: 11.5px;
+    padding: 2px 0 2px 6px;
+    border-left: 2px solid rgba(255, 255, 255, 0.2);
+    margin-top: 3px;
+}
+.dt-hud-ego-branch b { margin-right: 5px; opacity: 0.8; }
+.dt-hud-ego-branch.dt-off { opacity: 0.35; text-decoration: line-through; }
+
+.dt-hud-fore-list { font-size: 11.5px; }
+.dt-hud-fore-item {
+    padding: 4px 8px;
+    margin-top: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 5px;
+    border-left: 2px solid #b48ead;
+}
+
+/* 生成中角标 */
+.dt-hud-ego-busy {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #3a6ea5;
+    color: #fff;
+    white-space: nowrap;
+    z-index: 3;
+}
+
+/* 来自 Ego 的月历条目：用左边框区分来源 */
+.dt-hud-todo-item[data-source^="ego-"] { border-left: 3px solid #7aa2f7; }
+.dt-hud-todo-item[data-source="ego-schedule"] { border-left-color: #b48ead; }
+.dt-hud-todo-src {
+    font-size: 10px;
+    opacity: 0.6;
+    margin-left: 5px;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+}
+.dt-hud-todo-vague {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 10px;
+    opacity: 0.5;
+    cursor: help;
+}

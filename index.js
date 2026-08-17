@@ -60,6 +60,8 @@ function resolveTagColor(tag) {
 
 // ================= 默认设置 =================
 const defaultSettings = Object.freeze({
+    egoIntegration: true,   // 读取 Ego 小助手的日程/待办/剧情数据
+    egoToast: true,         // Ego 生成开始/结束时弹提示
     enabled: true,              // 总开关：是否注入提示词
     panelVisible: true,         // 悬浮窗是否显示
     panelCollapsed: false,      // 悬浮窗是否折叠
@@ -144,19 +146,190 @@ function saveManualTodos() {
     }
 }
 
-/** 合并 AI 解析出的待办与用户手动添加的待办（按 日期+内容 去重） */
+/**
+ * 待办去重用的归一化键。
+ * 直接比较原文会漏掉"角色今天去机场"和"角色今天下午去机场"这类只差几个字的重复，
+ * 所以先剥掉标点、时段词、指代今天的说法再比。
+ */
+function todoKey(date, text) {
+    const t = String(text || '')
+        .replace(/[\s\u3000，,。.、；;：:！!？?"'""''（）()【】\[\]]/g, '')
+        .replace(/今天|今日|当天|明天|后天/g, '')
+        .replace(/凌晨|清晨|早上|上午|中午|下午|傍晚|晚上|夜里|深夜/g, '')
+        .replace(/大约|大概|左右|可能|预计/g, '');
+    return `${date}||${t}`;
+}
+
+/** 合并三个来源的待办：用户手动 > 正文解析 > Ego 表格（按归一化键去重） */
 function getAllTodos() {
-    const manual = getManualTodos();
-    const seen = new Set(manual.map(t => `${t.date}||${t.text}`));
-    const merged = manual.map(t => ({ ...t, source: 'manual' }));
-    for (const t of parsedTodos) {
-        const key = `${t.date}||${t.text}`;
-        if (!seen.has(key)) {
-            seen.add(key);
-            merged.push(t);
-        }
+    const settings = getSettings();
+    const merged = [];
+    const seen = new Set();
+    const push = (t) => {
+        const k = todoKey(t.date, t.text);
+        if (seen.has(k)) return;
+        seen.add(k);
+        merged.push(t);
+    };
+
+    // 手动优先级最高（用户亲手写的不能被顶掉）
+    for (const t of getManualTodos()) push({ ...t, source: 'manual' });
+    for (const t of parsedTodos) push(t);
+    if (settings.egoIntegration !== false) {
+        for (const t of getEgoCalendarItems()) push(t);
     }
     return merged;
+}
+
+// ================= Ego 小助手数据桥接 =================
+// 监听 Ego 广播的生成事件（Ego ≥3.3.0 会发），用来显示开始/结束提醒。
+// Ego 版本较旧或没装时，下面的监听不会触发，一切照常。
+function bindEgoEvents() {
+    try {
+        window.addEventListener('ego:task', (ev) => {
+            if (getSettings().egoIntegration === false) return;
+            const d = ev.detail || {};
+            const badge = document.getElementById('dt_hud_ego_busy');
+            if (d.phase === 'start') {
+                if (badge) { badge.textContent = `⏳ ${d.label || '生成中'}`; badge.style.display = ''; }
+                if (getSettings().egoToast !== false) toastr?.info?.(`Ego 开始生成：${d.label || ''}`);
+            } else {
+                if (badge) badge.style.display = 'none';
+                if (getSettings().egoToast !== false) {
+                    if (d.ok === false) toastr?.error?.(`Ego 生成失败：${d.label || ''}`);
+                    else toastr?.success?.(`Ego 生成完成：${d.label || ''}${d.seconds ? `（${d.seconds}s）` : ''}`);
+                }
+                // 生成完数据就变了，刷新月历与事件区
+                renderDrawerContent();
+            }
+        });
+    } catch (e) { /* 忽略 */ }
+}
+
+// Ego 的数据全部存在同一个聊天的 chatMetadata 里，所以这里纯读取，
+// 不发任何请求、不消耗任何 token。Ego 没装或没数据时一律安全返回空。
+
+const EGO_MODULE = 'offscreen_widgets';
+
+function getEgoData() {
+    try {
+        const md = getContext()?.chatMetadata;
+        return (md && md[EGO_MODULE]) || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function isEgoInstalled() {
+    try {
+        return !!document.querySelector('#ow_menu_button') || !!getEgoData();
+    } catch (e) {
+        return false;
+    }
+}
+
+/** 当前所处的剧情事件 { id, title, core, branches } */
+function getEgoCurrentEvent() {
+    const ego = getEgoData();
+    const plot = ego?.plot;
+    if (!plot?.currentId || !Array.isArray(plot.events)) return null;
+    return plot.events.find(e => e.id === plot.currentId) || null;
+}
+
+/** 取某张 Ego 表格的行 */
+function getEgoTable(key) {
+    const t = getEgoData()?.offscreen?.tables;
+    return (t && Array.isArray(t[key])) ? t[key] : [];
+}
+
+/**
+ * 从 Ego 的表格里提取可以落到月历上的条目。
+ * 三个来源：
+ *   核心待办事项表 —— 本来就带确切时间，直接用
+ *   日程表         —— "时节性必然事件"常写成"八月底：月度总结会"，需要推断具体日期
+ *   伏笔表         —— 没有日期，只在侧栏列出，不占月历格子
+ */
+function getEgoCalendarItems() {
+    const out = [];
+
+    // 待办事项表：时间 | 事项 | 关联章节
+    for (const r of getEgoTable('timelineTable')) {
+        const date = normalizeDateKey(r.time || '');
+        if (!date || !r.task) continue;
+        out.push({ date, tag: '蓝', text: String(r.task).trim(), source: 'ego-todo', done: false });
+    }
+
+    // 日程表：角色 | 固定日程规律 | 时节性必然事件 | 弹性事务参考池
+    for (const r of getEgoTable('scheduleTable')) {
+        const who = String(r.role || '').trim();
+        const seasonal = String(r.seasonal || '').trim();
+        if (!seasonal || seasonal === '—') continue;
+        // 一格里可能写了多条，用分号/换行分开
+        for (const seg of seasonal.split(/[;；\n]/)) {
+            const piece = seg.trim();
+            if (!piece || piece === '—') continue;
+            const date = inferDateFromVagueText(piece);
+            if (!date) continue;
+            const text = piece.replace(/^[^：:]*[：:]\s*/, '').trim() || piece;
+            out.push({ date, tag: '紫', text: who ? `${who}：${text}` : text, source: 'ego-schedule', done: false, vague: true });
+        }
+    }
+    return out;
+}
+
+/**
+ * 把"八月底""下周三""8月15日"这类模糊说法推断成具体日期。
+ * 以剧情当前日期为基准年月；推不出来就返回 null（宁可不显示，也不要瞎标）。
+ */
+function inferDateFromVagueText(text) {
+    const t = String(text || '');
+    const base = lastInfo?.date ? new Date(normalizeDateKey(lastInfo.date) + 'T00:00:00') : new Date();
+    if (isNaN(base.getTime())) return null;
+    const Y = base.getFullYear();
+
+    // 明确写了月日
+    let m = t.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]/);
+    if (m) return fmtDate(Y, +m[1] - 1, +m[2]);
+    m = t.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+    if (m) return fmtDate(+m[1], +m[2] - 1, +m[3]);
+
+    // X月上旬/中旬/下旬/初/中/底/末
+    m = t.match(/(\d{1,2})\s*月\s*(上旬|中旬|下旬|初|中|底|末)/);
+    if (m) return fmtDate(Y, +m[1] - 1, dayOfPart(Y, +m[1] - 1, m[2]));
+
+    // 本月/这个月 + 上下旬
+    m = t.match(/(本月|这个月|当月)\s*(上旬|中旬|下旬|初|中|底|末)/);
+    if (m) return fmtDate(Y, base.getMonth(), dayOfPart(Y, base.getMonth(), m[2]));
+
+    // 单独的"月底/月初/月中"
+    if (/月底|月末/.test(t)) return fmtDate(Y, base.getMonth(), daysInMonth(Y, base.getMonth()));
+    if (/月初/.test(t)) return fmtDate(Y, base.getMonth(), 1);
+    if (/月中/.test(t)) return fmtDate(Y, base.getMonth(), 15);
+
+    // 每周X（固定日程）——取基准日之后最近的那一天
+    m = t.match(/每?周([一二三四五六日天])/);
+    if (m) {
+        const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 日: 0, 天: 0 };
+        const want = map[m[1]];
+        const d = new Date(base);
+        for (let i = 0; i < 7; i++) {
+            d.setDate(d.getDate() + (i === 0 ? 0 : 1));
+            if (d.getDay() === want) return fmtDate(d.getFullYear(), d.getMonth(), d.getDate());
+        }
+    }
+    return null;
+}
+
+function daysInMonth(y, mIdx) { return new Date(y, mIdx + 1, 0).getDate(); }
+function dayOfPart(y, mIdx, part) {
+    if (/上旬|初/.test(part)) return 5;
+    if (/中旬|中/.test(part)) return 15;
+    return daysInMonth(y, mIdx); // 下旬/底/末
+}
+function fmtDate(y, mIdx, d) {
+    const dt = new Date(y, mIdx, Math.min(d, daysInMonth(y, mIdx)));
+    if (isNaN(dt.getTime())) return null;
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 }
 
 // ================= 提示词构建 =================
@@ -511,6 +684,15 @@ function ensurePanelExists() {
                     </div>
 
                     <div class="dt-hud-tab-page" data-page="scene">
+                        <div class="dt-hud-ego-block" id="dt_hud_ego_block" style="display:none;">
+                            <div class="dt-hud-section-title">
+                                当前剧情事件
+                                <span class="dt-hud-ego-open" id="dt_hud_ego_open" title="打开 Ego 小助手">Ego ↗</span>
+                            </div>
+                            <div class="dt-hud-ego-event" id="dt_hud_ego_event"></div>
+                            <div class="dt-hud-section-title" id="dt_hud_fore_title" style="display:none;">未回收伏笔</div>
+                            <div class="dt-hud-fore-list" id="dt_hud_fore_list"></div>
+                        </div>
                         <div class="dt-hud-section-title">当前地点</div>
                         <div class="dt-hud-location" id="dt_hud_location_text">暂无数据</div>
                         <div class="dt-hud-section-title">主要人物着装</div>
@@ -524,6 +706,7 @@ function ensurePanelExists() {
                 </div>
             </div>
 
+            <div class="dt-hud-ego-busy" id="dt_hud_ego_busy" style="display:none;"></div>
             <div class="dt-hud-collapse-btn" id="dt_weather_hud_collapse_btn" title="折叠/展开时间">︿</div>
         </div>
     `;
@@ -670,6 +853,39 @@ function renderDrawerContent() {
     renderTodoList();
     renderScene();
     renderChapters();
+    renderEgoBlock();
+}
+
+/** 剧情事件 + 未回收伏笔（数据来自 Ego，纯读取） */
+function renderEgoBlock() {
+    const $block = $('#dt_hud_ego_block');
+    if (!$block.length) return;
+    if (getSettings().egoIntegration === false || !isEgoInstalled()) { $block.hide(); return; }
+    $block.show();
+
+    const ev = getEgoCurrentEvent();
+    const $ev = $('#dt_hud_ego_event');
+    if (!ev) {
+        $ev.html('<div class="dt-hud-todo-empty">暂无进行中的事件</div>');
+    } else {
+        const dead = getEgoData()?.plot?.deadBranches?.[ev.id] || [];
+        const branches = (ev.branches || [])
+            .map(b => {
+                const off = dead.includes(b.key);
+                return `<div class="dt-hud-ego-branch${off ? ' dt-off' : ''}">
+                    <b>${escapeHtml(b.key)}</b> ${escapeHtml(b.condition || '')}</div>`;
+            }).join('');
+        $ev.html(`
+            <div class="dt-hud-ego-title">[${escapeHtml(ev.id)}] ${escapeHtml(ev.title || '')}</div>
+            ${ev.core ? `<div class="dt-hud-ego-core">${escapeHtml(ev.core)}</div>` : ''}
+            ${branches}`);
+    }
+
+    const fore = getEgoTable('foreshadowTable').filter(r => !/已回收/.test(String(r.status || '')));
+    $('#dt_hud_fore_title').toggle(fore.length > 0);
+    $('#dt_hud_fore_list').html(fore.length
+        ? fore.map(r => `<div class="dt-hud-fore-item">${escapeHtml(r.content || r.tag || '')}</div>`).join('')
+        : '');
 }
 
 function renderCalendar() {
@@ -739,14 +955,26 @@ function renderTodoList() {
     }
 
     const html = items.map((t, idx) => `
-        <div class="dt-hud-todo-item ${t.done ? 'is-done' : ''}" data-key="${escapeHtml(t.date + '||' + t.text)}">
+        <div class="dt-hud-todo-item ${t.done ? 'is-done' : ''}" data-source="${escapeHtml(t.source || 'ai')}" data-key="${escapeHtml(t.date + '||' + t.text)}">
             <span class="dt-hud-todo-dot" style="background:${resolveTagColor(t.tag)}"></span>
-            <span class="dt-hud-todo-text">${escapeHtml(t.text)}</span>
-            <span class="dt-hud-todo-src">${t.source === 'manual' ? '手动' : '剧情'}</span>
+            <span class="dt-hud-todo-text">${escapeHtml(t.text)}${t.vague ? '<span class="dt-hud-todo-vague" title="日期由模糊描述推断，仅供参考">?</span>' : ''}</span>
+            <span class="dt-hud-todo-src">${
+                t.source === 'manual' ? '手动'
+                : t.source === 'ego-todo' ? 'Ego待办'
+                : t.source === 'ego-schedule' ? 'Ego日程'
+                : '剧情'}</span>
             ${t.source === 'manual' ? '<span class="dt-hud-todo-del" title="删除">×</span>' : ''}
         </div>
     `).join('');
     $list.html(html);
+}
+
+function openEgoAssistant() {
+    // Ego 的入口挂在酒馆"魔法棒"菜单里，直接触发它自己的按钮
+    const btn = document.querySelector('#ow_menu_button');
+    if (btn) { $(btn).trigger('click'); return true; }
+    toastr?.info?.('没找到 Ego 小助手，请确认已安装并启用');
+    return false;
 }
 
 function renderScene() {
@@ -790,6 +1018,8 @@ function bindDrawerEvents() {
     $drawer.on('pointerdown click', (e) => e.stopPropagation());
 
     // 标签页切换
+    $drawer.on('click', '#dt_hud_ego_open', (e) => { e.stopPropagation(); openEgoAssistant(); });
+
     $drawer.on('click', '.dt-hud-tab', function () {
         const tab = $(this).data('tab');
         $drawer.find('.dt-hud-tab').removeClass('active');
@@ -927,6 +1157,18 @@ function buildSettingsHtml() {
             </div>
             <div class="inline-drawer-content">
 
+                <label class="checkbox_label" for="dt_hud_ego_integration">
+                    <input id="dt_hud_ego_integration" type="checkbox" />
+                    <span>读取 Ego 小助手数据（日程 / 待办 / 剧情事件 / 伏笔）</span>
+                </label>
+                <label class="checkbox_label" for="dt_hud_ego_toast">
+                    <input id="dt_hud_ego_toast" type="checkbox" />
+                    <span>Ego 生成开始 / 结束时弹提示</span>
+                </label>
+                <div class="dt-hud-hint" style="opacity:.65;font-size:11px;margin:2px 0 8px;">
+                    纯读取同一聊天的存档数据，不发任何请求、不消耗 token。未安装 Ego 时自动隐藏相关内容。
+                </div>
+
                 <label class="checkbox_label" for="dt_hud_enabled">
                     <input id="dt_hud_enabled" type="checkbox" />
                     <span>启用提示词注入</span>
@@ -1008,6 +1250,8 @@ function bindSettingsEvents() {
     const settings = getSettings();
 
     const checkboxes = {
+        dt_hud_ego_integration: 'egoIntegration',
+        dt_hud_ego_toast: 'egoToast',
         dt_hud_enabled: 'enabled',
         dt_hud_panel_visible: 'panelVisible',
         dt_hud_hide_markers: 'hideMarkers',
@@ -1112,6 +1356,7 @@ function init() {
     applyCustomCss();
     injectSettingsPanel();
     registerEventListeners();
+    bindEgoEvents();
     rescanAndUpdate();
     applyAiDoneFlags();
     renderDrawerContent();
