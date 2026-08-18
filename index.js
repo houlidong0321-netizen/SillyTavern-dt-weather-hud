@@ -26,6 +26,8 @@ const OUTFIT_REGEX = /\[\s*着装\s*[:：]\s*([^\]]+?)\s*\]/;
 const TODO_REGEX_G = /\[\s*待办\s*[:：]\s*([^|\]]+?)\s*\|\s*([^|\]]+?)\s*\|\s*([^\]]+?)\s*\]/g;
 // [Chapter_1]2026-08-05 09:20-09:45 咖啡馆 摘要正文……
 const CHAPTER_REGEX_G = /\[\s*Chapter[_\s]*(\d+)\s*\]\s*([^\n\r]+)/gi;
+// [导火索: 2026-08-18 | 家族聚餐上被当众提起婚事]
+const TRIGGER_REGEX = /\[\s*导火索\s*[:：]\s*([^|\]]+?)\s*\|\s*([^\]]+?)\s*\]/;
 
 // 用于「隐藏正文标记」的整体匹配（含可选包裹标签与前置换行）
 const HIDE_PATTERNS = [
@@ -34,6 +36,7 @@ const HIDE_PATTERNS = [
     /\n?\[\s*地点\s*[:：]\s*[^\]]+?\s*\]\s*/g,
     /\n?\[\s*着装\s*[:：]\s*[^\]]+?\s*\]\s*/g,
     /\n?\[\s*待办\s*[:：]\s*[^|\]]+?\s*\|\s*[^|\]]+?\s*\|\s*[^\]]+?\s*\]\s*/g,
+    /\n?\[\s*导火索\s*[:：]\s*[^|\]]+?\s*\|\s*[^\]]+?\s*\]\s*/g,
     /\n?\[\s*Chapter[_\s]*\d+\s*\][^\n\r]*\s*/gi,
 ];
 
@@ -61,6 +64,7 @@ function resolveTagColor(tag) {
 // ================= 默认设置 =================
 const defaultSettings = Object.freeze({
     egoIntegration: true,   // 读取 Ego 小助手的日程/待办/剧情数据
+    egoScheduleTrigger: true, // 让模型给"下一个事件的导火索"排一个具体日期，落到月历
     egoToast: true,         // Ego 生成开始/结束时弹提示
     enabled: true,              // 总开关：是否注入提示词
     panelVisible: true,         // 悬浮窗是否显示
@@ -91,6 +95,7 @@ let lastLocation = '';      // 当前地点
 let lastOutfits = [];       // [{ name, desc }]
 let lastChapter = null;     // 只保留最后一条章节摘要 { num, text, index }
 let parsedTodos = [];       // 从正文解析出的待办 [{ date, tag, text, source:'ai' }]
+let parsedTrigger = null;   // 下一个剧情事件的导火索排期 { date, text }
 let calendarCursor = null;  // { year, month }  当前月历显示的月份（month 从 0 开始）
 let selectedDay = null;     // 'YYYY-MM-DD'
 let drawerOpen = false;
@@ -174,6 +179,19 @@ function getAllTodos() {
 
     // 手动优先级最高（用户亲手写的不能被顶掉）
     for (const t of getManualTodos()) push({ ...t, source: 'manual' });
+
+    // 剧情导火索：只有当它指向的事件仍在进行中才显示
+    if (settings.egoIntegration !== false && settings.egoScheduleTrigger !== false && parsedTrigger) {
+        const ev = getEgoCurrentEvent();
+        if (ev) {
+            push({
+                date: parsedTrigger.date, tag: '红',
+                text: `【导火索】${parsedTrigger.text}`,
+                source: 'ego-trigger', done: false,
+                eventId: ev.id, eventTitle: ev.title,
+            });
+        }
+    }
     for (const t of parsedTodos) push(t);
     if (settings.egoIntegration !== false) {
         for (const t of getEgoCalendarItems()) push(t);
@@ -253,10 +271,22 @@ function getEgoCalendarItems() {
     const out = [];
 
     // 待办事项表：时间 | 事项 | 关联章节
+    // 其中关联章节写成 `[Plot_XX]` 的，是 Ego 推演排期过来的"剧情导火索"，单独标记
     for (const r of getEgoTable('timelineTable')) {
         const date = normalizeDateKey(r.time || '');
         if (!date || !r.task) continue;
-        out.push({ date, tag: '蓝', text: String(r.task).trim(), source: 'ego-todo', done: false });
+        const isPlot = /\[Plot_/.test(String(r.chapter || ''));
+        const raw = String(r.task).trim();
+        // 形如 "[事件02] 代价｜导火索：媒体拍到" —— 月历里显示导火索本身更有用
+        const m = raw.match(/^\[事件(\w+)\]\s*(.*?)｜导火索[:：]\s*(.+)$/);
+        out.push({
+            date,
+            tag: isPlot ? '红' : '蓝',
+            text: m ? `${m[3]}` : raw,
+            title: m ? `事件${m[1]}「${m[2]}」的导火索` : raw,
+            source: isPlot ? 'ego-plot' : 'ego-todo',
+            done: false,
+        });
     }
 
     // 日程表：角色 | 固定日程规律 | 时节性必然事件 | 弹性事务参考池
@@ -368,6 +398,9 @@ function buildPromptText() {
     if (settings.injectSummary) {
         lines.push(`[Chapter_${nextChapter}]日期+时间（正文开始时间-正文结束时间）+地点+摘要`);
     }
+    if (settings.injectTodo && settings.egoScheduleTrigger && getEgoCurrentEvent()) {
+        lines.push('[导火索: YYYY-MM-DD | 一句话说明这件事会怎么开始]');
+    }
 
     lines.push('</scene_data>');
     lines.push('');
@@ -385,6 +418,16 @@ function buildPromptText() {
     }
     if (settings.injectTodo) {
         lines.push(`${n++}. 【待办】仅当本章正文中出现了明确的约定、计划、期限、任务时才输出，可以有多行，没有则完全不输出该行。颜色只能从【红/橙/黄/绿/青/蓝/紫/灰】中选一个，用于表示紧急或分类（如：红=紧急或危险，蓝=普通约定，绿=日常事务）。日期填该事项发生或截止的日期。`);
+    }
+
+    if (settings.injectTodo && settings.egoScheduleTrigger) {
+        const ev = getEgoCurrentEvent();
+        if (ev) {
+            lines.push(`${n++}. 【导火索】当前正在进行的剧情事件是「${ev.title || ''}」，它的导火索是：${ev.trigger || '（未写明）'}`);
+            lines.push('   请为这个导火索**排一个具体日期**（在当前剧情日期之后的合理近期，一般 1-14 天内），让它有明确的切入点，不要拖太久。');
+            lines.push('   已经排过期、且日期仍在未来的，请沿用同一个日期不要改动；导火索已经实际发生过了，就不要再输出这一行。');
+            lines.push('   只输出这一个导火索的日期，不要为后续其它事件排期。');
+        }
     }
 
     if (settings.injectSummary) {
@@ -452,6 +495,7 @@ function scanChat() {
     lastOutfits = [];
     lastChapter = null;
     parsedTodos = [];
+    parsedTrigger = null;
 
     const todoSeen = new Set();
 
@@ -500,10 +544,18 @@ function scanChat() {
             const tag = tm[2].trim();
             const content = tm[3].trim();
             if (!dateKey || !content) continue;
-            const key = `${dateKey}||${content}`;
+            const key = todoKey(dateKey, content);
             if (todoSeen.has(key)) continue;
             todoSeen.add(key);
             parsedTodos.push({ date: dateKey, tag, text: content, source: 'ai', done: false });
+        }
+
+        // [导火索: 日期 | 说明] —— 只保留最新一条（后面的覆盖前面的）
+        const trm = TRIGGER_REGEX.exec(text);
+        if (trm) {
+            const d = normalizeDateKey(trm[1]);
+            const desc = String(trm[2] || '').trim();
+            if (d && desc) parsedTrigger = { date: d, text: desc };
         }
     }
 }
@@ -957,11 +1009,13 @@ function renderTodoList() {
     const html = items.map((t, idx) => `
         <div class="dt-hud-todo-item ${t.done ? 'is-done' : ''}" data-source="${escapeHtml(t.source || 'ai')}" data-key="${escapeHtml(t.date + '||' + t.text)}">
             <span class="dt-hud-todo-dot" style="background:${resolveTagColor(t.tag)}"></span>
-            <span class="dt-hud-todo-text">${escapeHtml(t.text)}${t.vague ? '<span class="dt-hud-todo-vague" title="日期由模糊描述推断，仅供参考">?</span>' : ''}</span>
+            <span class="dt-hud-todo-text"${t.title ? ` title="${escapeHtml(t.title)}"` : ''}>${escapeHtml(t.text)}${t.vague ? '<span class="dt-hud-todo-vague" title="日期由模糊描述推断，仅供参考">?</span>' : ''}</span>
             <span class="dt-hud-todo-src">${
                 t.source === 'manual' ? '手动'
+                : t.source === 'ego-plot' ? '剧情'
                 : t.source === 'ego-todo' ? 'Ego待办'
                 : t.source === 'ego-schedule' ? 'Ego日程'
+                : t.source === 'ego-trigger' ? '剧情导火索'
                 : '剧情'}</span>
             ${t.source === 'manual' ? '<span class="dt-hud-todo-del" title="删除">×</span>' : ''}
         </div>
@@ -1161,6 +1215,10 @@ function buildSettingsHtml() {
                     <input id="dt_hud_ego_integration" type="checkbox" />
                     <span>读取 Ego 小助手数据（日程 / 待办 / 剧情事件 / 伏笔）</span>
                 </label>
+                <label class="checkbox_label" for="dt_hud_ego_trigger">
+                    <input id="dt_hud_ego_trigger" type="checkbox" />
+                    <span>为当前事件的导火索排一个具体日期（落到月历）</span>
+                </label>
                 <label class="checkbox_label" for="dt_hud_ego_toast">
                     <input id="dt_hud_ego_toast" type="checkbox" />
                     <span>Ego 生成开始 / 结束时弹提示</span>
@@ -1251,6 +1309,7 @@ function bindSettingsEvents() {
 
     const checkboxes = {
         dt_hud_ego_integration: 'egoIntegration',
+        dt_hud_ego_trigger: 'egoScheduleTrigger',
         dt_hud_ego_toast: 'egoToast',
         dt_hud_enabled: 'enabled',
         dt_hud_panel_visible: 'panelVisible',

@@ -701,3 +701,9 @@
     opacity: 0.5;
     cursor: help;
 }
+/* Ego 推演排期过来的剧情导火索 */
+.dt-hud-todo-item[data-source="ego-plot"] { border-left-color: #e5787d; }
+.dt-hud-todo-item[data-source="ego-trigger"] {
+    border-left-color: #e5787d;
+    background: rgba(229, 120, 125, 0.08);
+}

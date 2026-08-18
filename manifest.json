@@ -7,7 +7,7 @@
     "js": "index.js",
     "css": "style.css",
     "author": "Custom Extension",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "homePage": "https://github.com/houlidong0321-netizen/SillyTavern-dt-weather-hud",
     "auto_update": false
 }
